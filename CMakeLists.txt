@@ -17,16 +17,16 @@ file(GLOB_RECURSE HEADER_FILES "${CMAKE_SOURCE_DIR}/MultiVoxel/Header/*.hpp")
 
 add_executable(MultiVoxel ${SOURCE_FILES} ${HEADER_FILES})
 
-target_include_directories(MultiVoxel PUBLIC "${CMAKE_SOURCE_DIR}/Library/Header/")
+target_include_directories(MultiVoxel PUBLIC "${CMAKE_SOURCE_DIR}/MultiVoxel/Header/")
 
 target_include_directories(MultiVoxel PUBLIC "${CMAKE_SOURCE_DIR}/Library/Header/")
 
 if (APPLE)
     target_link_libraries(MultiVoxel PRIVATE "${CMAKE_SOURCE_DIR}/Library/Binary/MacOS/libGameNetworkingSockets_s.a")
 elseif (WIN32 AND CMAKE_BUILD_TYPE STREQUAL "Debug")
-    target_link_libraries(MultiVoxel PRIVATE "${CMAKE_SOURCE_DIR}/Library/Binary/Windows/Debug/GameNetworkingSockets_s.lib")
+    target_link_libraries(MultiVoxel PRIVATE "${CMAKE_SOURCE_DIR}/Library/Binary/Windows/Debug/GameNetworkingSockets.lib")
 elseif (WIN32 AND CMAKE_BUILD_TYPE STREQUAL "Release")
-    target_link_libraries(MultiVoxel PRIVATE "${CMAKE_SOURCE_DIR}/Library/Binary/Windows/Release/GameNetworkingSockets_s.lib")
+    target_link_libraries(MultiVoxel PRIVATE "${CMAKE_SOURCE_DIR}/Library/Binary/Windows/Release/GameNetworkingSockets.lib")
 else()
     message("No suitable platform found")
 endif()
