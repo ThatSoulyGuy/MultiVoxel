@@ -14,6 +14,8 @@ namespace MultiVoxel::Independent::Network
 
         virtual ~PacketSender() = default;
 
-        virtual bool SendPacket(IndexedString&, std::string&) = 0;
+        virtual bool SendPacket(std::string&, std::string&) = 0;
+
+        bool sent = false;
     };
 }

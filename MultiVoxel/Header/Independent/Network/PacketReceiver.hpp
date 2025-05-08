@@ -14,6 +14,6 @@ namespace MultiVoxel::Independent::Network
 
         virtual ~PacketReceiver() = default;
 
-        virtual void OnPacketReceived(const IndexedString&, const std::string&) = 0;
+        virtual void OnPacketReceived(const std::string&, const std::string&) = 0;
     };
 }

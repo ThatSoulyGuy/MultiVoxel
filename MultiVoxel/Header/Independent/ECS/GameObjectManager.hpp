@@ -1,11 +1,11 @@
 #pragma once
 
 #include "Independent/Utility/SingletonManager.hpp"
-#include "Server/ECS/GameObject.hpp"
+#include "Independent/ECS/GameObject.hpp"
 
-namespace MultiVoxel::Server::ECS
+namespace MultiVoxel::Independent::ECS
 {
-	class GameObjectManager
+	class GameObjectManager final : SingletonManager<std::shared_ptr<GameObject>, const IndexedString&>
 	{
 
 	public:
@@ -15,7 +15,7 @@ namespace MultiVoxel::Server::ECS
 		GameObjectManager& operator=(const GameObjectManager&) = delete;
 		GameObjectManager& operator=(GameObjectManager&&) = delete;
 
-		std::shared_ptr<GameObject> Register(std::shared_ptr<GameObject> object)
+		std::shared_ptr<GameObject> Register(std::shared_ptr<GameObject> object) override
 		{
 			auto name = object->GetName();
 
@@ -26,11 +26,12 @@ namespace MultiVoxel::Server::ECS
 			}
 
 			gameObjectMap.insert({ name, std::move(object) });
+			networkMap.insert({ gameObjectMap[name]->GetNetworkId(), gameObjectMap[name] });
 
 			return gameObjectMap[name];
 		}
 
-		void Unregister(IndexedString name)
+		void Unregister(const IndexedString& name) override
 		{
 			if (!gameObjectMap.contains(name))
 			{
@@ -38,15 +39,17 @@ namespace MultiVoxel::Server::ECS
 				return;
 			}
 
+			networkMap.erase(gameObjectMap[name]->GetNetworkId());
+
 			gameObjectMap.erase(name);
 		}
 
-		bool Has(IndexedString name)
+		bool Has(const IndexedString& name) override
 		{
 			return gameObjectMap.contains(name);
 		}
 
-		std::optional<std::shared_ptr<GameObject>> Get(IndexedString name)
+		std::optional<std::shared_ptr<GameObject>> Get(const IndexedString& name) override
 		{
 			if (!gameObjectMap.contains(name))
 			{
@@ -57,7 +60,18 @@ namespace MultiVoxel::Server::ECS
 			return gameObjectMap.contains(name) ? std::make_optional<std::shared_ptr<GameObject>>(gameObjectMap[name]) : std::nullopt;
 		}
 
-		std::vector<std::shared_ptr<GameObject>> GetAll()
+		std::optional<std::shared_ptr<GameObject>> Get(const NetworkId& id)
+		{
+			if (!networkMap.contains(id))
+			{
+				std::cerr << "Game object map doesn't have game object '" << id << "'!";
+				return std::nullopt;
+			}
+
+			return networkMap.contains(id) ? std::make_optional<std::shared_ptr<GameObject>>(networkMap[id]) : std::nullopt;
+		}
+
+		std::vector<std::shared_ptr<GameObject>> GetAll() override
 		{
 			std::vector<std::shared_ptr<GameObject>> result(gameObjectMap.size());
 
@@ -93,6 +107,7 @@ namespace MultiVoxel::Server::ECS
 		GameObjectManager() = default;
 
 		std::unordered_map<IndexedString, std::shared_ptr<GameObject>> gameObjectMap;
+		std::unordered_map<NetworkId, std::shared_ptr<GameObject>> networkMap;
 
 		static std::once_flag initializationFlag;
 		static std::unique_ptr<GameObjectManager> instance;
@@ -101,9 +116,4 @@ namespace MultiVoxel::Server::ECS
 
 	std::once_flag GameObjectManager::initializationFlag;
 	std::unique_ptr<GameObjectManager> GameObjectManager::instance;
-
-	static_assert(
-		SingletonManager<GameObjectManager, std::shared_ptr<GameObject>, IndexedString>,
-		"GameObjectManager must implement Register/Unregister/Has/Get/GetAll exactly as the SingletonManager concept requires"
-		);
 }

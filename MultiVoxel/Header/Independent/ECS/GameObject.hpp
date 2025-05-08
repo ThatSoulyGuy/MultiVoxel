@@ -7,12 +7,12 @@
 #include <optional>
 #include "Independent/Math/Transform.hpp"
 #include "Independent/Utility/IndexedString.hpp"
-#include "Server/ECS/Component.hpp"
+#include "Independent/ECS/Component.hpp"
 
 using namespace MultiVoxel::Independent::Math;
 using namespace MultiVoxel::Independent::Utility;
 
-namespace MultiVoxel::Server::ECS
+namespace MultiVoxel::Independent::ECS
 {
 	template <typename T>
 	concept ComponentType = std::derived_from<T, Component> && requires(T a)
@@ -37,7 +37,7 @@ namespace MultiVoxel::Server::ECS
 		{
 			child->SetParent(shared_from_this());
 
-			auto name = child->name;
+			auto& name = child->name;
 
 			childMap.insert({ child->name, std::move(child) });
 
@@ -81,6 +81,22 @@ namespace MultiVoxel::Server::ECS
 			componentMap.insert({ typeid(T), std::move(std::static_pointer_cast<Component>(component)) });
 
 			return std::static_pointer_cast<T>(componentMap[typeid(T)]);
+		}
+
+		void AddComponentDynamic(std::shared_ptr<Component> component)
+		{
+			auto type = std::type_index(typeid(*component));
+
+			if (componentMap.contains(type))
+			{
+				std::cerr << "Component map for game object '" << name.operator std::string() << "' already has component '" << type.name() << "'!\n";
+				return;
+			}
+
+			component->gameObject = shared_from_this();
+			component->Initialize();
+
+			componentMap[type] = std::move(component);
 		}
 
 		template <ComponentType T>
@@ -144,6 +160,38 @@ namespace MultiVoxel::Server::ECS
 			return name;
 		}
 
+		const auto& GetComponentMap() const
+		{
+			return componentMap;
+		}
+
+		std::shared_ptr<Component> GetComponentByTypeName(const std::string& typeName)
+		{
+			for (auto& [idx, comp] : componentMap)
+			{
+				if (typeid(*comp).name() == typeName)
+					return comp;
+			}
+
+			return nullptr;
+		}
+
+		NetworkId GetNetworkId() const
+		{
+			return networkId;
+		}
+
+		void SetNetworkId(NetworkId id)
+		{
+			networkId = id;
+			isServer = false;
+		}
+
+		bool IsAuthoritative() const
+		{
+			return isServer;
+		}
+
 		void Update()
 		{
 			for (auto& [type, component] : componentMap)
@@ -166,6 +214,8 @@ namespace MultiVoxel::Server::ECS
 		{
 			std::shared_ptr<GameObject> result(new GameObject());
 
+			result->networkId = GetNextNetworkId();
+			result->isServer = true;
 			result->name = name;
 			result->AddComponent(Transform::Create({ 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 1.0f }));
 
@@ -175,6 +225,9 @@ namespace MultiVoxel::Server::ECS
 	private:
 
 		GameObject() = default;
+
+		NetworkId networkId = 0;
+		bool isServer = false;
 
 		std::optional<std::weak_ptr<GameObject>> parent;
 

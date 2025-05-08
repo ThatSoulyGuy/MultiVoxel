@@ -57,7 +57,10 @@ namespace MultiVoxel::Independent::Network
                 peer->Send(message);
         }
 
-        void FlushOutgoing() { }
+        void FlushOutgoing()
+        {
+            sockets->RunCallbacks();
+        }
 
         bool StartServer(uint16_t port)
         {
@@ -102,6 +105,11 @@ namespace MultiVoxel::Independent::Network
         MessageDispatcher& GetDispatcher()
         {
             return messageDispatcher;
+        }
+
+        void AddOnPlayerConnectedCallback(const std::function<void()>& callback)
+        {
+            playerConnectedCallbackList.push_back(callback);
         }
 
         static NetworkManager& GetInstance()
@@ -200,6 +208,10 @@ namespace MultiVoxel::Independent::Network
 
             case k_ESteamNetworkingConnectionState_Connected:
                 std::cout << "Connection fully established: (handle=" << info->m_hConn << ")\n";
+
+                for (auto& callback : instance->playerConnectedCallbackList)
+                    callback();
+
                 break;
 
             case k_ESteamNetworkingConnectionState_ClosedByPeer:
@@ -223,10 +235,11 @@ namespace MultiVoxel::Independent::Network
         static std::mutex logMutex;
 
         ISteamNetworkingSockets* sockets = nullptr;
-        ISteamNetworkingUtils* utilities;
+        ISteamNetworkingUtils* utilities = nullptr;
         HSteamNetPollGroup pollGroup = 0;
         HSteamListenSocket listenerSocket = k_HSteamListenSocket_Invalid;
 
+        std::vector<std::function<void()>> playerConnectedCallbackList;
         std::vector<std::unique_ptr<PeerConnection>> peerList;
 
         MessageDispatcher messageDispatcher;

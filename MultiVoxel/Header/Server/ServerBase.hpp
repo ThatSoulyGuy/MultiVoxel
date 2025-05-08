@@ -10,6 +10,7 @@
 #include "Independent/Network/NetworkManager.hpp"
 #include "Independent/Network/PacketReceiver.hpp"
 #include "Independent/Network/PacketSender.hpp"
+#include "Server/ServerApplication.hpp"
 
 using namespace std::chrono;
 using namespace MultiVoxel::Independent::Network;
@@ -21,91 +22,10 @@ namespace MultiVoxel::Server
 
     public:
 
-        void Run()
+        bool Initialize(uint32_t port)
         {
-            if (!isInitialized)
-                return;
+            serverPort = port;
 
-            running = true;
-
-            const auto tickInterval = milliseconds(50);
-
-            while (running)
-            {
-                auto start = steady_clock::now();
-
-                auto& networkManager = NetworkManager::GetInstance();
-
-                networkManager.PollEvents();
-
-                for (auto* sender : packetSenderList)
-                {
-                    IndexedString packetName;
-                    std::string packetData;
-
-                    while (sender->SendPacket(packetName, packetData))
-                    {
-                        std::ostringstream os;
-
-                        cereal::BinaryOutputArchive oa(os);
-
-                        oa(packetName, packetData);
-
-                        auto const& buffer = os.str();
-
-                        networkManager.Broadcast(Message::Create(Message::Type::Custom, buffer.data(), buffer.size(), true));
-                    }
-                }
-
-                networkManager.FlushOutgoing();
-
-                for (auto& callback : onUpdateCallbackList)
-                    callback();
-
-                auto elapsed = duration_cast<milliseconds>(steady_clock::now() - start);
-
-                if (elapsed < tickInterval)
-                    std::this_thread::sleep_for(tickInterval - elapsed);
-            }
-        }
-
-        void Stop()
-        {
-            running = false;
-        }
-
-        void RegisterPacketSender(PacketSender* sender)
-        {
-            packetSenderList.push_back(sender);
-        }
-
-        void RegisterPacketReceiver(PacketReceiver* receiver)
-        {
-            packetReceiverList.push_back(receiver);
-        }
-
-        void RegisterOnUpdateCallback(const std::function<void()> callback)
-        {
-            onUpdateCallbackList.push_back(callback);
-        }
-
-        static std::unique_ptr<ServerBase> Create(uint16_t port)
-        {
-            auto result = std::unique_ptr<ServerBase>(new ServerBase());
-
-            result->serverPort = port;
-            result->running = false;
-            result->isInitialized = false;
-
-            return (result->Initialize() ? std::move(result) : nullptr);
-        }
-
-    private:
-
-        ServerBase() = default;
-
-        bool Initialize()
-        {
             auto& networkManager = NetworkManager::GetInstance();
 
             if (!networkManager.StartServer(serverPort))
@@ -136,18 +56,167 @@ namespace MultiVoxel::Server
                             receiver->OnPacketReceived(name, data);
                     });
 
+            networkManager.AddOnPlayerConnectedCallback([&]()
+            {
+                Settings::GetInstance().REPLICATION_SENDER.Get().Reset();
+
+                for (auto& gameObject : GameObjectManager::GetInstance().GetAll())
+                    Settings::GetInstance().REPLICATION_SENDER.Get().QueueSpawn(gameObject);
+
+                for (auto& go : GameObjectManager::GetInstance().GetAll())
+                {
+                    for (auto& [ti, comp] : go->GetComponentMap())
+                    {
+                        if (auto net = dynamic_cast<INetworkSerializable*>(comp.get()))
+                            net->MarkDirty();
+                    }
+                }
+            });
+
+            ServerApplication::GetInstance().Preinitialize();
+            ServerApplication::GetInstance().Initialize();
+            
             isInitialized = true;
+
             return true;
         }
 
-        uint16_t serverPort;
+        void Run()
+        {
+            if (!isInitialized)
+                return;
 
-        std::atomic<bool> running;
+            running = true;
 
-        bool isInitialized;
+            const auto tickInterval = milliseconds(50);
 
-        std::vector<std::function<void()>> onUpdateCallbackList;
+            while (running)
+            {
+                auto start = steady_clock::now();
+
+                auto& networkManager = NetworkManager::GetInstance();
+
+                networkManager.PollEvents();
+
+                for (auto* sender : packetSenderList)
+                {
+                    std::string packetName;
+                    std::string packetData;
+
+                    while (sender->SendPacket(packetName, packetData))
+                    {
+                        std::ostringstream os;
+                        cereal::BinaryOutputArchive oa(os);
+
+                        oa(packetName, packetData);
+                        auto const& buffer = os.str();
+
+                        networkManager.Broadcast(Message::Create(Message::Type::Custom, buffer.data(), buffer.size(), true));
+                    }
+                }
+
+                networkManager.FlushOutgoing();
+
+                ServerApplication::GetInstance().Update();
+                ServerApplication::GetInstance().Render();
+
+                auto elapsed = duration_cast<milliseconds>(steady_clock::now() - start);
+
+                if (elapsed < tickInterval)
+                    std::this_thread::sleep_for(tickInterval - elapsed);
+            }
+        }
+
+        void Stop()
+        {
+            ServerApplication::GetInstance().Uninitialize();
+
+            running = false;
+        }
+
+        void RegisterPacketSender(PacketSender* sender)
+        {
+            packetSenderList.push_back(sender);
+        }
+
+        void RegisterPacketReceiver(PacketReceiver* receiver)
+        {
+            packetReceiverList.push_back(receiver);
+        }
+
+        template <typename T, typename = std::enable_if_t<std::is_base_of<MultiVoxel::Independent::ECS::Component, T>::value>>
+        void RegisterECSComponentId(uint32_t id, std::shared_ptr<T> component)
+        {
+            if (componentIdMap.contains(id))
+            {
+                std::cerr << "Component ID map already contains id '" << id << "'!" << std::endl;
+                return;
+            }
+
+            componentIdMap.insert({ id, std::static_pointer_cast<Component>(component) });
+        }
+
+        template <typename T, typename = std::enable_if_t<std::is_base_of<MultiVoxel::Independent::ECS::Component, T>::value>>
+        std::shared_ptr<T> GetECSComponentById(uint32_t id)
+        {
+            if (!componentIdMap.contains(id))
+            {
+                std::cerr << "Component ID map doesn't contain id '" << id << "'!" << std::endl;
+                return nullptr;
+            }
+
+            return std::static_pointer_cast<T>(componentIdMap[id]);
+        }
+
+        void UnregisterECSComponentId(uint32_t id)
+        {
+            if (!componentIdMap.contains(id))
+            {
+                std::cerr << "Component ID map doesn't contain id '" << id << "'!" << std::endl;
+                return;
+            }
+
+            componentIdMap.erase(id);
+        }
+
+        static ServerBase& GetInstance()
+        {
+            std::call_once(initializationFlag, [&]()
+            {
+                instance = []()
+                {
+                    auto result = std::unique_ptr<ServerBase>(new ServerBase());
+
+                    result->running = false;
+                    result->isInitialized = false;
+
+                    return std::move(result);
+                }();
+            });
+            
+            return *instance;
+        }
+
+    private:
+
+        ServerBase() = default;
+
+        uint16_t serverPort = 0;
+
+        std::atomic<bool> running = false;
+
+        bool isInitialized = false;
+
         std::vector<PacketSender*> packetSenderList;
         std::vector<PacketReceiver*> packetReceiverList;
+
+        std::unordered_map<uint32_t, std::weak_ptr<MultiVoxel::Independent::ECS::Component>> componentIdMap;
+        
+        static std::once_flag initializationFlag;
+        static std::unique_ptr<ServerBase> instance;
+
     };
+
+    std::once_flag ServerBase::initializationFlag;
+    std::unique_ptr<ServerBase> ServerBase::instance;
 }

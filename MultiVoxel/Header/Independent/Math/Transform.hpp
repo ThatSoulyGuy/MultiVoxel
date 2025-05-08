@@ -4,15 +4,17 @@
 #include <optional>
 #include <numbers>
 #include <functional>
-#include "Server/ECS/Component.hpp"
+#include <cereal/types/optional.hpp>
+#include "Independent/ECS/Component.hpp"
+#include "Independent/ECS/ComponentFactory.hpp"
 #include "Independent/Math/Matrix.hpp"
 #include "Independent/Math/Vector.hpp"
 
-using namespace MultiVoxel::Server::ECS;
+using namespace MultiVoxel::Independent::ECS;
 
 namespace MultiVoxel::Independent::Math
 {
-    class Transform final : public Component
+    class Transform final : public Component, public INetworkSerializable
     {
 
     public:
@@ -23,6 +25,8 @@ namespace MultiVoxel::Independent::Math
 
             for (auto& function : onPositionUpdated)
                 function(localPosition);
+
+            dirty = true;
         }
 
         void Rotate(const Vector<float, 3>& rotationDeg)
@@ -39,6 +43,8 @@ namespace MultiVoxel::Independent::Math
 
             for (auto& function : onRotationUpdated)
                 function(localRotation);
+
+            dirty = true;
         }
 
         void Scale(const Vector<float, 3>& scale)
@@ -47,6 +53,8 @@ namespace MultiVoxel::Independent::Math
 
             for (auto& function : onScaleUpdated)
                 function(localScale);
+
+            dirty = true;
         }
 
         Vector<float, 3> GetLocalPosition() const
@@ -63,6 +71,8 @@ namespace MultiVoxel::Independent::Math
 
             for (auto& function : onPositionUpdated)
                 function(localPosition);
+
+            dirty = true;
         }
 
         Vector<float, 3> GetLocalRotation() const
@@ -87,6 +97,8 @@ namespace MultiVoxel::Independent::Math
 
             for (auto& function : onRotationUpdated)
                 function(localRotation);
+
+            dirty = true;
         }
 
         Vector<float, 3> GetLocalScale() const
@@ -103,6 +115,8 @@ namespace MultiVoxel::Independent::Math
 
             for (auto& function : onScaleUpdated)
                 function(localScale);
+
+            dirty = true;
         }
 
         Vector<float, 3> GetWorldPosition() const
@@ -241,6 +255,38 @@ namespace MultiVoxel::Independent::Math
             return localMatrix;
         }
 
+        void Serialize(cereal::BinaryOutputArchive& ar) const override
+        {
+            ar(localPosition, localRotation, localScale);
+        }
+
+        void Deserialize(cereal::BinaryInputArchive& ar) override
+        {
+            ar(localPosition, localRotation, localScale);
+
+            dirty = false;
+        }
+
+        void MarkDirty() override
+        {
+            dirty = true;
+        }
+
+        bool IsDirty() const override
+        {
+            return dirty;
+        }
+
+        void ClearDirty() override
+        {
+            dirty = false;
+        }
+
+        std::string GetComponentTypeName() const override
+        {
+            return typeid(Transform).name();
+        }
+
         static std::shared_ptr<Transform> Create(const Vector<float, 3>& position, const Vector<float, 3>& rotation, const Vector<float, 3>& scale)
         {
             std::shared_ptr<Transform> result(new Transform());
@@ -256,6 +302,10 @@ namespace MultiVoxel::Independent::Math
 
         Transform() = default;
 
+        friend class ComponentFactory;
+
+        bool dirty = true;
+
         std::optional<std::weak_ptr<Transform>> parent;
 
         std::vector<std::function<void(Vector<float, 3>)>> onPositionUpdated;
@@ -266,5 +316,4 @@ namespace MultiVoxel::Independent::Math
         Vector<float, 3> localRotation = { 0.0f, 0.0f, 0.0f };
         Vector<float, 3> localScale = { 1.0f, 1.0f, 1.0f };
     };
-
 }
