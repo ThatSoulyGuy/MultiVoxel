@@ -44,6 +44,19 @@ namespace MultiVoxel::Independent::ECS
 			gameObjectMap.erase(name);
 		}
 
+		void Unregister(NetworkId id)
+		{
+			if (!networkMap.contains(id))
+			{
+				std::cerr << "Game object map doesn't have game object '" << id << "'!";
+				return;
+			}
+
+			gameObjectMap.erase(networkMap[id].lock()->GetName());
+			
+			networkMap.erase(id);
+		}
+
 		bool Has(const IndexedString& name) override
 		{
 			return gameObjectMap.contains(name);
@@ -107,7 +120,7 @@ namespace MultiVoxel::Independent::ECS
 		GameObjectManager() = default;
 
 		std::unordered_map<IndexedString, std::shared_ptr<GameObject>> gameObjectMap;
-		std::unordered_map<NetworkId, std::shared_ptr<GameObject>> networkMap;
+		std::unordered_map<NetworkId, std::weak_ptr<GameObject>> networkMap;
 
 		static std::once_flag initializationFlag;
 		static std::unique_ptr<GameObjectManager> instance;

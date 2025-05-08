@@ -16,6 +16,8 @@ namespace MultiVoxel::Independent::Network
 
         virtual bool SendPacket(std::string&, std::string&) = 0;
 
+        virtual void Reload() = 0;
+
         bool sent = false;
     };
 }

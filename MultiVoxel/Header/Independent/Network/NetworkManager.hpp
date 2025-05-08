@@ -107,6 +107,16 @@ namespace MultiVoxel::Independent::Network
             return messageDispatcher;
         }
 
+        ISteamNetworkingSockets* GetSockets()
+        {
+            return sockets;
+        }
+
+        HSteamNetPollGroup& GetPollGroup()
+        {
+            return pollGroup;
+        }
+
         void AddOnPlayerConnectedCallback(const std::function<void()>& callback)
         {
             playerConnectedCallbackList.push_back(callback);

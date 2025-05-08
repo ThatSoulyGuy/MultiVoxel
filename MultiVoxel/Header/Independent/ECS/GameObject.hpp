@@ -40,6 +40,7 @@ namespace MultiVoxel::Independent::ECS
 			auto& name = child->name;
 
 			childMap.insert({ child->name, std::move(child) });
+			childMapByNetworkId.insert({ childMap[name]->GetNetworkId(), childMap[name] });
 
 			return childMap[name];
 		}
@@ -55,6 +56,17 @@ namespace MultiVoxel::Independent::ECS
 			return std::make_optional<std::shared_ptr<GameObject>>(childMap[name]);
 		}
 
+		std::optional<std::shared_ptr<GameObject>> GetChild(NetworkId id)
+		{
+			if (childMapByNetworkId.contains(id))
+			{
+				std::cerr << "Child map for game object '" << this->name << "' doesn't have game object '" << id << "'!";
+				return std::nullopt;
+			}
+
+			return std::make_optional<std::shared_ptr<GameObject>>(childMapByNetworkId[id].lock());
+		}
+
 		void RemoveChild(const IndexedString& name)
 		{
 			if (childMap.contains(name))
@@ -63,7 +75,20 @@ namespace MultiVoxel::Independent::ECS
 				return;
 			}
 
+			childMapByNetworkId.erase(childMap[name]->GetNetworkId());
 			childMap.erase(name);
+		}
+
+		void RemoveChild(NetworkId id)
+		{
+			if (childMap.contains(name))
+			{
+				std::cerr << "Child map for game object '" << this->name << "' doesn't have game object '" << name << "'!";
+				return;
+			}
+
+			childMap.erase(childMapByNetworkId[id].lock()->GetName());
+			childMapByNetworkId.erase(id);
 		}
 
 		template <ComponentType T>
@@ -233,6 +258,7 @@ namespace MultiVoxel::Independent::ECS
 
 		std::unordered_map<std::type_index, std::shared_ptr<Component>> componentMap;
 		std::unordered_map<IndexedString, std::shared_ptr<GameObject>> childMap;
+		std::unordered_map<NetworkId, std::weak_ptr<GameObject>> childMapByNetworkId;
 
 		IndexedString name;
 

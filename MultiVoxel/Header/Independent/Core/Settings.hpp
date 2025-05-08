@@ -4,11 +4,11 @@
 #include <mutex>
 #include <memory>
 #include <unordered_map>
-#include "Client/ReplicationReceiver.hpp"
-#include "Server/ReplicationSender.hpp"
+#include "Client/Packet/ReplicationReceiver.hpp"
+#include "Server/Packet/ReplicationSender.hpp"
 
-using namespace MultiVoxel::Client;
-using namespace MultiVoxel::Server;
+using namespace MultiVoxel::Client::Packet;
+using namespace MultiVoxel::Server::Packet;
 
 namespace MultiVoxel::Independent::ECS
 {
@@ -49,6 +49,17 @@ namespace MultiVoxel::Independent::Core
 
 	public:
 
+		~Settings()
+		{
+			delete REPLICATION_RECEIVER.Get();
+			delete REPLICATION_SENDER.Get();
+		}
+
+		Settings(const Settings&) = delete;
+		Settings(Settings&&) = delete;
+		Settings& operator=(const Settings&) = delete;
+		Settings& operator=(Settings&&) = delete;
+
 		static Settings& GetInstance()
 		{
 			std::call_once(initializationFlag, [&]()
@@ -59,8 +70,8 @@ namespace MultiVoxel::Independent::Core
 			return *instance;
 		}
 
-		Setting<ReplicationReceiver, false> REPLICATION_RECEIVER = { ReplicationReceiver() };
-		Setting<ReplicationSender, false> REPLICATION_SENDER = { ReplicationSender() };
+		Setting<ReplicationReceiver*, false> REPLICATION_RECEIVER = { new ReplicationReceiver() };
+		Setting<ReplicationSender*, false> REPLICATION_SENDER = { new ReplicationSender() };
 
 	private:
 

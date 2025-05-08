@@ -6,7 +6,7 @@
 using namespace MultiVoxel::Independent::ECS;
 using namespace MultiVoxel::Independent::Network;
 
-namespace MultiVoxel::Client
+namespace MultiVoxel::Client::Packet
 {
     class ReplicationReceiver : public PacketReceiver
     {

@@ -7,12 +7,14 @@
 #include <cereal/cereal.hpp>
 #include <cereal/archives/binary.hpp>
 #include <cereal/types/string.hpp>
-#include "Client/ClientApplication.hpp"
+#include "Client/Core/Window.hpp"
+#include "Client/ClientInterfaceLayer.hpp"
 #include "Independent/Network/NetworkManager.hpp"
 #include "Independent/Network/PacketReceiver.hpp"
 #include "Independent/Network/PacketSender.hpp"
 
 using namespace std::chrono;
+using namespace MultiVoxel::Client::Core;
 using namespace MultiVoxel::Independent::Network;
 using namespace MultiVoxel::Independent;
 
@@ -22,6 +24,11 @@ namespace MultiVoxel::Client
     {
 
     public:
+
+        ClientBase(const ClientBase&) = delete;
+        ClientBase(ClientBase&&) = delete;
+        ClientBase& operator=(const ClientBase&) = delete;
+        ClientBase& operator=(ClientBase&&) = delete;
 
         bool Initialize(const std::string& address, uint32_t port)
         {
@@ -55,8 +62,8 @@ namespace MultiVoxel::Client
                             receiver->OnPacketReceived(IndexedString(name), data);
                     });
 
-            ClientApplication::GetInstance().Preinitialize();
-            ClientApplication::GetInstance().Initialize();
+            ClientInterfaceLayer::GetInstance().CallEvent("preinitialize");
+            ClientInterfaceLayer::GetInstance().CallEvent("initialize");
 
             isInitialized = true;
 
@@ -70,7 +77,7 @@ namespace MultiVoxel::Client
 
             const auto frameCap = milliseconds(16);
 
-            while (ClientApplication::GetInstance().IsRunning())
+            while (Window::GetInstance().IsRunning())
             {
                 auto start = steady_clock::now();
 
@@ -105,8 +112,8 @@ namespace MultiVoxel::Client
 
                 networkManager.FlushOutgoing();
 
-                ClientApplication::GetInstance().Update();
-                ClientApplication::GetInstance().Render();
+                ClientInterfaceLayer::GetInstance().CallEvent("update");
+                ClientInterfaceLayer::GetInstance().CallEvent("render");
 
                 auto elapsed = duration_cast<milliseconds>(steady_clock::now() - start);
 
@@ -114,7 +121,7 @@ namespace MultiVoxel::Client
                     std::this_thread::sleep_for(frameCap - elapsed);
             }
 
-            ClientApplication::GetInstance().Uninitialize();
+            ClientInterfaceLayer::GetInstance().CallEvent("uninitialize");
         }
 
         void RegisterPacketSender(PacketSender* sender)

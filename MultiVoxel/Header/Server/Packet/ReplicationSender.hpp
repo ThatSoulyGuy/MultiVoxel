@@ -6,9 +6,9 @@
 using namespace MultiVoxel::Independent::ECS;
 using namespace MultiVoxel::Independent::Network;
 
-namespace MultiVoxel::Server
+namespace MultiVoxel::Server::Packet
 {
-    class ReplicationSender : public PacketSender
+    class ReplicationSender final : public PacketSender
     {
 
     public:
@@ -21,6 +21,23 @@ namespace MultiVoxel::Server
         void QueueSpawn(const std::shared_ptr<GameObject>& go)
         {
             spawnQueue.push_back(go);
+        }
+
+        void Reload() override
+        {
+            Reset();
+
+            for (auto& gameObject : GameObjectManager::GetInstance().GetAll())
+                QueueSpawn(gameObject);
+
+            for (auto& go : GameObjectManager::GetInstance().GetAll())
+            {
+                for (auto& [ti, comp] : go->GetComponentMap())
+                {
+                    if (auto net = dynamic_cast<INetworkSerializable*>(comp.get()))
+                        net->MarkDirty();
+                }
+            }
         }
 
         bool SendPacket(std::string& outName, std::string& outData) override

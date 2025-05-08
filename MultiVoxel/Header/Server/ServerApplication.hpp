@@ -4,6 +4,8 @@
 #include <memory>
 #include "Independent/Core/Settings.hpp"
 #include "Independent/ECS/GameObjectManager.hpp"
+#include "Server/ServerBase.hpp"
+#include "Server/ServerInterfaceLayer.hpp"
 
 using namespace MultiVoxel::Independent::Core;
 using namespace MultiVoxel::Independent::ECS;
@@ -67,7 +69,7 @@ namespace MultiVoxel::Server
 
 		void Preinitialize()
 		{
-			
+			ServerBase::GetInstance().RegisterPacketSender(Settings::GetInstance().REPLICATION_SENDER.Get());
 		}
 
 		void Initialize()
@@ -76,7 +78,7 @@ namespace MultiVoxel::Server
 
 			square->AddComponent(std::shared_ptr<TestComponent>(new TestComponent));
 
-			Settings::GetInstance().REPLICATION_SENDER.Get().QueueSpawn(square);
+			Settings::GetInstance().REPLICATION_SENDER.Get()->QueueSpawn(square);
 		}
 
 		void Update()
@@ -98,7 +100,18 @@ namespace MultiVoxel::Server
 		{
 			std::call_once(initializationFlag, [&]()
 			{
-				instance = std::unique_ptr<ServerApplication>(new ServerApplication());
+				instance = [&]()
+				{
+					auto result = std::unique_ptr<ServerApplication>(new ServerApplication());
+					
+					ServerInterfaceLayer::GetInstance().HookEvent("preinitialize", [&]() { result->Preinitialize(); });
+					ServerInterfaceLayer::GetInstance().HookEvent("initialize", [&]() { result->Initialize(); });
+					ServerInterfaceLayer::GetInstance().HookEvent("update", [&]() { result->Update(); });
+					ServerInterfaceLayer::GetInstance().HookEvent("render", [&]() { result->Render(); });
+					ServerInterfaceLayer::GetInstance().HookEvent("uninitialize", [&]() { result->Uninitialize(); });
+
+					return std::move(result);
+				}();
 			});
 
 			return *instance;

@@ -1,6 +1,7 @@
 #pragma once
 
-#include <concepts>
+#include <optional>
+#include <vector>
 
 namespace MultiVoxel::Independent::Utility
 {

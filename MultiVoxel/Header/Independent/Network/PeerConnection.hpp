@@ -28,7 +28,7 @@ namespace MultiVoxel::Independent::Network
                 sockets->CloseConnection(connection, 0, nullptr, false);
         }
 
-        HSteamNetConnection GetHandle() const
+        HSteamNetConnection GetHandle() const 
         {
             return connection;
         }

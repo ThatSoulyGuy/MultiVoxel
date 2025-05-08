@@ -7,12 +7,15 @@
 #include <cereal/cereal.hpp>
 #include <cereal/archives/binary.hpp>
 #include <cereal/types/string.hpp>
+#include "Independent/Core/Settings.hpp"
 #include "Independent/Network/NetworkManager.hpp"
 #include "Independent/Network/PacketReceiver.hpp"
 #include "Independent/Network/PacketSender.hpp"
-#include "Server/ServerApplication.hpp"
+#include "Server/Packet/RpcReceiver.hpp"
+#include "Server/ServerInterfaceLayer.hpp"
 
 using namespace std::chrono;
+using namespace MultiVoxel::Independent::Core;
 using namespace MultiVoxel::Independent::Network;
 
 namespace MultiVoxel::Server
@@ -21,6 +24,11 @@ namespace MultiVoxel::Server
     {
 
     public:
+
+        ServerBase(const ServerBase&) = delete;
+        ServerBase(ServerBase&&) = delete;
+        ServerBase& operator=(const ServerBase&) = delete;
+        ServerBase& operator=(ServerBase&&) = delete;
 
         bool Initialize(uint32_t port)
         {
@@ -36,7 +44,7 @@ namespace MultiVoxel::Server
 
             networkManager.GetDispatcher()
                 .RegisterHandler(Message::Type::Custom,
-                    [&](PeerConnection&, Message const& msg)
+                    [&](PeerConnection& peer, Message const& msg)
                     {
                         const auto& buffer = msg.GetBuffer();
 
@@ -46,35 +54,28 @@ namespace MultiVoxel::Server
 
                         cereal::BinaryInputArchive archive(is);
 
-                        IndexedString name;
-
+                        std::string name;
                         std::string data;
 
                         archive(name, data);
 
                         for (auto* receiver : packetReceiverList)
-                            receiver->OnPacketReceived(name, data);
+                        {
+                            if (name == "RpcChannel")
+                                RpcReceiver::Create().HandleRpc(peer, data);
+                            else
+                                receiver->OnPacketReceived(name, data);
+                        }
                     });
 
             networkManager.AddOnPlayerConnectedCallback([&]()
             {
-                Settings::GetInstance().REPLICATION_SENDER.Get().Reset();
-
-                for (auto& gameObject : GameObjectManager::GetInstance().GetAll())
-                    Settings::GetInstance().REPLICATION_SENDER.Get().QueueSpawn(gameObject);
-
-                for (auto& go : GameObjectManager::GetInstance().GetAll())
-                {
-                    for (auto& [ti, comp] : go->GetComponentMap())
-                    {
-                        if (auto net = dynamic_cast<INetworkSerializable*>(comp.get()))
-                            net->MarkDirty();
-                    }
-                }
+                for (auto* sender : packetSenderList)
+                    sender->Reload();
             });
 
-            ServerApplication::GetInstance().Preinitialize();
-            ServerApplication::GetInstance().Initialize();
+            ServerInterfaceLayer::GetInstance().CallEvent("preinitialize");
+            ServerInterfaceLayer::GetInstance().CallEvent("initialize");
             
             isInitialized = true;
 
@@ -117,8 +118,8 @@ namespace MultiVoxel::Server
 
                 networkManager.FlushOutgoing();
 
-                ServerApplication::GetInstance().Update();
-                ServerApplication::GetInstance().Render();
+                ServerInterfaceLayer::GetInstance().CallEvent("update");
+                ServerInterfaceLayer::GetInstance().CallEvent("render");
 
                 auto elapsed = duration_cast<milliseconds>(steady_clock::now() - start);
 
@@ -129,7 +130,7 @@ namespace MultiVoxel::Server
 
         void Stop()
         {
-            ServerApplication::GetInstance().Uninitialize();
+            ServerInterfaceLayer::GetInstance().CallEvent("uninitialize");
 
             running = false;
         }
@@ -142,41 +143,6 @@ namespace MultiVoxel::Server
         void RegisterPacketReceiver(PacketReceiver* receiver)
         {
             packetReceiverList.push_back(receiver);
-        }
-
-        template <typename T, typename = std::enable_if_t<std::is_base_of<MultiVoxel::Independent::ECS::Component, T>::value>>
-        void RegisterECSComponentId(uint32_t id, std::shared_ptr<T> component)
-        {
-            if (componentIdMap.contains(id))
-            {
-                std::cerr << "Component ID map already contains id '" << id << "'!" << std::endl;
-                return;
-            }
-
-            componentIdMap.insert({ id, std::static_pointer_cast<Component>(component) });
-        }
-
-        template <typename T, typename = std::enable_if_t<std::is_base_of<MultiVoxel::Independent::ECS::Component, T>::value>>
-        std::shared_ptr<T> GetECSComponentById(uint32_t id)
-        {
-            if (!componentIdMap.contains(id))
-            {
-                std::cerr << "Component ID map doesn't contain id '" << id << "'!" << std::endl;
-                return nullptr;
-            }
-
-            return std::static_pointer_cast<T>(componentIdMap[id]);
-        }
-
-        void UnregisterECSComponentId(uint32_t id)
-        {
-            if (!componentIdMap.contains(id))
-            {
-                std::cerr << "Component ID map doesn't contain id '" << id << "'!" << std::endl;
-                return;
-            }
-
-            componentIdMap.erase(id);
         }
 
         static ServerBase& GetInstance()
@@ -207,11 +173,11 @@ namespace MultiVoxel::Server
 
         bool isInitialized = false;
 
+        std::unordered_map<std::string, HSteamNetConnection> players;
+
         std::vector<PacketSender*> packetSenderList;
         std::vector<PacketReceiver*> packetReceiverList;
 
-        std::unordered_map<uint32_t, std::weak_ptr<MultiVoxel::Independent::ECS::Component>> componentIdMap;
-        
         static std::once_flag initializationFlag;
         static std::unique_ptr<ServerBase> instance;
 
