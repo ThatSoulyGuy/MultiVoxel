@@ -63,17 +63,7 @@ namespace MultiVoxel::Client
 
 		void Initialize()
 		{
-			auto future = RpcClient::GetInstance().CreateGameObjectAsync("default.hi", 0);
-
-			std::thread([future = std::move(future)]() mutable
-			{
-				auto gameObject = future.get();
-					
-				MainThreadInvoker::EnqueueTask([&]()
-				{
-					gameObject->AddComponent(std::shared_ptr<SomeOtherComponent>(new SomeOtherComponent()));
-				});
-			}).detach();
+			
 		}
 
 		void Update()

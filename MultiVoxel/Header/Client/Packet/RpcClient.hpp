@@ -36,6 +36,21 @@ namespace MultiVoxel::Client::Packet
             return pendingCreateMap[callId].get_future();
         }
 
+        void DestroyGameObject(const std::string& name)
+        {
+            requestList.push_back({ 0, RpcType::DestroyGameObject, name, 0 });
+        }
+
+        void AddChildToGameObject(const std::string& name, NetworkId childId)
+        {
+            requestList.push_back({ 0, RpcType::AddChild, name, childId });
+        }
+
+        void RemoveChildFromGameObject(const std::string& name, NetworkId childId)
+        {
+            requestList.push_back({ 0, RpcType::RemoveChild, name, childId });
+        }
+
         bool SendPacket(std::string& outName, std::string& outData) override
         {
             if (requestList.empty())
@@ -48,8 +63,8 @@ namespace MultiVoxel::Client::Packet
 
             for (auto& r : requestList)
             {
-                ar(r.CallId, r.Type);
-                ar(r.Name, r.ParentId);
+                ar(r.callId, r.type);
+                ar(r.name, r.parentId);
             }
 
             requestList.clear();
@@ -81,23 +96,24 @@ namespace MultiVoxel::Client::Packet
                 if (t == RpcType::CreateGameObjectResponse)
                 {
                     NetworkId newId;
+                    std::string name;
+                    NetworkId parentId;
+                    ar(newId, name, parentId);
 
-                    ar(newId);
+                    auto go = GameObject::Create(IndexedString(name));
 
-                    auto optGO = GameObjectManager::GetInstance().Get(newId);
-                    std::shared_ptr<GameObject> ptr = optGO ? *optGO : nullptr;
+                    go->SetNetworkId(newId);
+
+                    if (parentId != 0)
+                        GameObjectManager::GetInstance().Get(parentId).value()->AddChild(go);
+
+                    GameObjectManager::GetInstance().Register(go);
 
                     std::lock_guard lk(mutex);
 
-                    auto it = pendingCreateMap.find(callId);
-
-                    if (it != pendingCreateMap.end())
-                    {
-                        it->second.set_value(ptr);
-                        pendingCreateMap.erase(it);
-                    }
+                    pendingCreateMap[callId].set_value(go);
+                    pendingCreateMap.erase(callId);
                 }
-                // … handle other response types …
             }
         }
 
@@ -115,10 +131,10 @@ namespace MultiVoxel::Client::Packet
 
         struct Request
         {
-            uint64_t CallId;
-            RpcType  Type;
-            std::string Name;
-            NetworkId  ParentId;
+            uint64_t callId;
+            RpcType type;
+            std::string name;
+            NetworkId parentId;
         };
 
         uint64_t nextCallId{ 1 };

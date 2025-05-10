@@ -59,13 +59,11 @@ namespace MultiVoxel::Server
 
                         archive(name, data);
 
+                        if (name == "RpcChannel")
+                            RpcReceiver::Create().HandleRpc(peer, data);
+
                         for (auto* receiver : packetReceiverList)
-                        {
-                            if (name == "RpcChannel")
-                                RpcReceiver::Create().HandleRpc(peer, data);
-                            else
-                                receiver->OnPacketReceived(name, data);
-                        }
+                            receiver->OnPacketReceived(name, data);
                     });
 
             networkManager.AddOnPlayerConnectedCallback([&]()

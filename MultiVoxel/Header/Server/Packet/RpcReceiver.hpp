@@ -15,7 +15,7 @@ using namespace MultiVoxel::Server;
 
 namespace MultiVoxel::Server::Packet
 {
-    class RpcReceiver
+    class RpcReceiver final
     {
 
     public:
@@ -37,8 +37,8 @@ namespace MultiVoxel::Server::Packet
 
                 ar(callId, rpc);
 
-                //if (!PermissionManager::GetInstance().HasPermission(who, rpc))
-                //    continue;
+                if (!PermissionManager::GetInstance().HasPermission(who, rpc))
+                    continue;
 
                 switch (rpc)
                 {
@@ -98,12 +98,26 @@ namespace MultiVoxel::Server::Packet
 
             Settings::GetInstance().REPLICATION_SENDER.Get()->QueueSpawn(go);
 
-            std::ostringstream os;
-            cereal::BinaryOutputArchive rar(os);
+            std::ostringstream inner;
 
-            rar(std::string("RpcChannel"));
-            rar(uint32_t(1));
-            rar(callId, RpcType::CreateGameObjectResponse, go->GetNetworkId());
+            {
+                cereal::BinaryOutputArchive ar(inner);
+
+                ar(uint32_t(1));
+
+                ar(callId,
+                    RpcType::CreateGameObjectResponse,
+                    go->GetNetworkId(),
+                    go->GetName().operator std::string(),
+                    go->GetParent().has_value() ? go->GetParent().value()->GetNetworkId() : 0);
+            }
+
+            std::ostringstream os;
+            cereal::BinaryOutputArchive ar(os);
+
+            ar(std::string(RpcClient::RpcChannelName));
+
+            ar(inner.str());
 
             auto const& buf = os.str();
             auto msg = Message::Create(Message::Type::Custom, buf.data(), buf.size(), true);

@@ -7,6 +7,7 @@
 #include <cereal/cereal.hpp>
 #include <cereal/archives/binary.hpp>
 #include <cereal/types/string.hpp>
+#include <cereal/types/vector.hpp>
 #include "Client/Core/Window.hpp"
 #include "Client/ClientInterfaceLayer.hpp"
 #include "Independent/Network/NetworkManager.hpp"
@@ -56,6 +57,7 @@ namespace MultiVoxel::Client
 
                         std::string name;
                         std::string data;
+
                         archive(name, data);
 
                         for (auto* receiver : packetReceiverList)

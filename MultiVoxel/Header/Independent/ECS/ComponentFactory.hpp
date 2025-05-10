@@ -44,17 +44,18 @@ namespace MultiVoxel::Independent::ECS
 
     private:
 
-        static auto& GetRegistry()
+        static std::unordered_map<std::string, Creator>& GetRegistry()
         {
             static std::unordered_map<std::string, Creator> registry;
+
             return registry;
         }
 
         static std::mutex& GetMutex()
         {
-            static std::mutex m;
+            static std::mutex mutex;
 
-            return m;
+            return mutex;
         }
     };
 }

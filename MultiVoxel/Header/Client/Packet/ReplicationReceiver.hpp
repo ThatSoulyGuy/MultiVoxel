@@ -34,6 +34,7 @@ namespace MultiVoxel::Client::Packet
                 auto go = GameObject::Create(IndexedString(nm));
 
                 go->SetNetworkId(nid);
+                go->RemoveComponent<Transform>();
 
                 GameObjectManager::GetInstance().Register(go);
             }

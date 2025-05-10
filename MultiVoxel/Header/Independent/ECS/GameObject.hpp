@@ -153,7 +153,7 @@ namespace MultiVoxel::Independent::ECS
 			if (!componentMap.contains(typeid(T)))
 			{
 				std::cerr << "Component map for game object '" << name << "' doesn't contain component '" << typeid(T).name() << "'!";
-				return nullptr;
+				return;
 			}
 
 			componentMap.erase(typeid(T));
