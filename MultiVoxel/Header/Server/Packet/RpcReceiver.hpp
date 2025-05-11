@@ -72,6 +72,10 @@ namespace MultiVoxel::Server::Packet
                         HandleRemoveChild(parent, child);
                         break;
                     }
+
+                    case RpcType::RequestFullSync:
+                        Settings::GetInstance().REPLICATION_SENDER.Get()->Reload();
+                        break;
                 }
             }
         }

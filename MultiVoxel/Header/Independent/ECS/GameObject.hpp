@@ -81,7 +81,7 @@ namespace MultiVoxel::Independent::ECS
 
 		void RemoveChild(NetworkId id)
 		{
-			if (childMap.contains(name))
+			if (childMap.contains(name)) 
 			{
 				std::cerr << "Child map for game object '" << this->name << "' doesn't have game object '" << name << "'!";
 				return;

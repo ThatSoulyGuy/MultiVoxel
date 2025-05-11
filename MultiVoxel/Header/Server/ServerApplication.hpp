@@ -57,6 +57,8 @@ namespace MultiVoxel::Server
 		}
 	};
 
+	REGISTER_COMPONENT(TestComponent);
+
 	class ServerApplication final
 	{
 

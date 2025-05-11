@@ -13,22 +13,37 @@ namespace MultiVoxel::Server::Packet
 
     public:
 
-        void Reset()
-        {
-            sent = false;
-        }
-
         void QueueSpawn(const std::shared_ptr<GameObject>& go)
         {
             spawnQueue.push_back(go);
         }
 
+        void QueueDelete(NetworkId id)
+        {
+            deleteQueue.push_back(id);
+        }
+
+        void QueueAddChild(NetworkId parent, NetworkId child)
+        {
+            addChildQueue.emplace_back(parent, child);
+        }
+
+        void QueueRemoveChild(NetworkId parent, NetworkId child)
+        {
+            removeChildQueue.emplace_back(parent, child);
+        }
+
         void Reload() override
         {
-            Reset();
+            sent = false;
 
-            for (auto& gameObject : GameObjectManager::GetInstance().GetAll())
-                QueueSpawn(gameObject);
+            spawnQueue.clear();
+            deleteQueue.clear();
+            addChildQueue.clear();
+            removeChildQueue.clear();
+
+            for (auto& go : GameObjectManager::GetInstance().GetAll())
+                spawnQueue.push_back(go);
 
             for (auto& go : GameObjectManager::GetInstance().GetAll())
             {
@@ -42,23 +57,42 @@ namespace MultiVoxel::Server::Packet
 
         bool SendPacket(std::string& outName, std::string& outData) override
         {
-            if (sent)
-                return false;
+            if (sent) return false;
 
-            std::ostringstream stream;
+            std::ostringstream os;
+            cereal::BinaryOutputArchive ar(os);
 
-            cereal::BinaryOutputArchive archive(stream);
-
-            archive(uint32_t(spawnQueue.size()));
+            ar(uint32_t(spawnQueue.size()));
 
             for (auto& go : spawnQueue)
-                archive(go->GetNetworkId(), go->GetName().operator std::string());
+                ar(go->GetNetworkId(), go->GetName().operator std::string());
 
             spawnQueue.clear();
 
+            ar(uint32_t(deleteQueue.size()));
+
+            for (auto id : deleteQueue)
+                ar(id);
+
+            deleteQueue.clear();
+
+            ar(uint32_t(addChildQueue.size()));
+
+            for (auto& [p, c] : addChildQueue)
+                ar(p, c);
+
+            addChildQueue.clear();
+
+            ar(uint32_t(removeChildQueue.size()));
+
+            for (auto& [p, c] : removeChildQueue)
+                ar(p, c);
+
+            removeChildQueue.clear();
+
             auto all = GameObjectManager::GetInstance().GetAll();
 
-            archive(uint32_t(all.size()));
+            ar(uint32_t(all.size()));
 
             for (auto& go : all)
             {
@@ -66,18 +100,18 @@ namespace MultiVoxel::Server::Packet
                 {
                     if (auto net = dynamic_cast<INetworkSerializable*>(comp.get()); net && net->IsDirty())
                     {
-                        archive(true, go->GetNetworkId(), net->GetComponentTypeName());
+                        ar(true, go->GetNetworkId(), net->GetComponentTypeName());
 
-                        net->Serialize(archive);
+                        net->Serialize(ar);
                         net->ClearDirty();
                     }
                 }
             }
 
-            archive(false);
+            ar(false);
 
             outName = SyncChannelName;
-            outData = stream.str();
+            outData = os.str();
 
             sent = true;
 
@@ -86,7 +120,12 @@ namespace MultiVoxel::Server::Packet
 
     private:
 
+        bool sent = false;
+
         std::vector<std::shared_ptr<GameObject>> spawnQueue;
+        std::vector<NetworkId> deleteQueue;
+        std::vector<std::pair<NetworkId, NetworkId>> addChildQueue;
+        std::vector<std::pair<NetworkId, NetworkId>> removeChildQueue;
 
     };
 }

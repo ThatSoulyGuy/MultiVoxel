@@ -21,7 +21,10 @@ namespace MultiVoxel::Client::Packet
 
     public:
 
-        void Reload() override { }
+        void Reload() override
+        {
+            requestList.push_back({ 0, RpcType::RequestFullSync, "", 0});
+        }
 
         std::future<std::shared_ptr<GameObject>> CreateGameObjectAsync(const std::string& name, NetworkId parentId)
         {

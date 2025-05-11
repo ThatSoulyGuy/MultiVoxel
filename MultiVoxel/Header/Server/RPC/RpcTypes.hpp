@@ -11,6 +11,7 @@ namespace MultiVoxel::Server::Rpc
         DestroyGameObject = 1,
         AddChild = 2,
         RemoveChild = 3,
+        RequestFullSync = 4,
         CreateGameObjectResponse = 128,
         AddChildResponse = 129,
     };

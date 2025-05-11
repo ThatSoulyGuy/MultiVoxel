@@ -7,6 +7,17 @@
 #include <mutex>
 #include "Independent/ECS/Component.hpp"
 
+#define CONCAT_IMPL(a, b) a##b
+#define CONCAT(a, b)      CONCAT_IMPL(a, b)
+
+#define REGISTER_COMPONENT(Type)                                              \
+namespace {                                                                    \
+    static const bool CONCAT(_component_registered_, __COUNTER__) = [](){     \
+        ComponentFactory::Register<Type>();                                    \
+        return true;                                                           \
+    }();                                                                       \
+}
+
 namespace MultiVoxel::Independent::ECS
 {
     class ComponentFactory

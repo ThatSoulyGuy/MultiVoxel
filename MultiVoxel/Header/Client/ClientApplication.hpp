@@ -2,8 +2,7 @@
 
 #include <mutex>
 #include <memory>
-#include "Client/Core/Window.hpp"
-#include "Client/Packet/RpcClient.hpp"
+#include "Client/Core/Window.hpp" 
 #include "Client/ClientBase.hpp"
 #include "Independent/ECS/ComponentFactory.hpp"
 #include "Independent/ECS/GameObjectManager.hpp"
@@ -26,6 +25,8 @@ namespace MultiVoxel::Client
 			std::cout << "hi from some other component :D" << std::endl;
 		}
 	};
+
+	REGISTER_COMPONENT(SomeOtherComponent);
 
 	class ClientApplication final
 	{
@@ -55,10 +56,6 @@ namespace MultiVoxel::Client
 			}());
 
 			Window::GetInstance().Initialize("MultiVoxel* 2.4.2", { 750, 450 });
-
-			ComponentFactory::Register<Transform>();
-			ComponentFactory::Register<Server::TestComponent>();
-			ComponentFactory::Register<SomeOtherComponent>();
 		}
 
 		void Initialize()
