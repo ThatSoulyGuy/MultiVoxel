@@ -50,10 +50,10 @@ namespace MultiVoxel::Client
                     {
                         const auto& buffer = msg.GetBuffer();
 
-                        std::string rawData{ reinterpret_cast<const char*>(buffer.data()), buffer.size() };
+                        std::string dataIn{ reinterpret_cast<const char*>(buffer.data()), buffer.size() };
 
-                        std::istringstream is(rawData);
-                        cereal::BinaryInputArchive archive(is);
+                        std::istringstream stream(dataIn);
+                        cereal::BinaryInputArchive archive(stream);
 
                         std::string name;
                         std::string data;
@@ -89,26 +89,19 @@ namespace MultiVoxel::Client
 
                 for (auto* sender : packetSenderList)
                 {
-                    std::string pktName;
-                    std::string pktData;
+                    std::string packetName;
+                    std::string packetData;
 
-                    while (sender->SendPacket(pktName, pktData))
+                    while (sender->SendPacket(packetName, packetData))
                     {
-                        std::ostringstream os;
-                        cereal::BinaryOutputArchive oa(os);
+                        std::ostringstream stream;
+                        cereal::BinaryOutputArchive archive(stream);
 
-                        oa(pktName, pktData);
+                        archive(packetName, packetData);
 
-                        auto const& buf = os.str();
+                        auto const& buffer = stream.str();
 
-                        Message out = Message::Create(
-                            Message::Type::Custom,
-                            buf.data(),
-                            buf.size(),
-                            true
-                        );
-
-                        networkManager.Broadcast(out);
+                        networkManager.Broadcast(Message::Create(Message::Type::Custom, buffer.data(), buffer.size(), true));
                     }
                 }
 

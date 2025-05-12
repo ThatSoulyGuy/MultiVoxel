@@ -1,7 +1,7 @@
 #pragma once
 
-#include <mutex>
 #include <memory>
+#include <mutex>
 #include "Independent/Core/Settings.hpp"
 #include "Independent/ECS/GameObjectManager.hpp"
 #include "Server/ServerBase.hpp"
@@ -36,11 +36,12 @@ namespace MultiVoxel::Server
 
 		void Deserialize(cereal::BinaryInputArchive& ar) override { }
 
-		void MarkDirty()
+		void MarkDirty() override
 		{
 			dirty = true;
 		}
 
+		[[nodiscard]]
 		bool IsDirty() const override
 		{
 			return dirty;
@@ -51,6 +52,7 @@ namespace MultiVoxel::Server
 			dirty = false;
 		}
 
+		[[nodiscard]]
 		std::string GetComponentTypeName() const override
 		{
 			return typeid(TestComponent).name();
@@ -69,31 +71,31 @@ namespace MultiVoxel::Server
 		ServerApplication& operator=(const ServerApplication&) = delete;
 		ServerApplication& operator=(ServerApplication&&) = delete;
 
-		void Preinitialize()
+		static void Preinitialize()
 		{
 			ServerBase::GetInstance().RegisterPacketSender(Settings::GetInstance().REPLICATION_SENDER.Get());
 		}
 
-		void Initialize()
+		static void Initialize()
 		{
 			auto square = GameObjectManager::GetInstance().Register(GameObject::Create({ "default.some" }));
 
-			square->AddComponent(std::shared_ptr<TestComponent>(new TestComponent));
+			square->AddComponent(std::make_shared<TestComponent>());
 
 			Settings::GetInstance().REPLICATION_SENDER.Get()->QueueSpawn(square);
 		}
 
-		void Update()
+		static void Update()
 		{
 			GameObjectManager::GetInstance().Update();
 		}
 
-		void Render()
+		static void Render()
 		{
 			GameObjectManager::GetInstance().Render();
 		}
 
-		void Uninitialize()
+		static void Uninitialize()
 		{
 			
 		}
@@ -106,11 +108,11 @@ namespace MultiVoxel::Server
 				{
 					auto result = std::unique_ptr<ServerApplication>(new ServerApplication());
 					
-					ServerInterfaceLayer::GetInstance().HookEvent("preinitialize", [&]() { result->Preinitialize(); });
-					ServerInterfaceLayer::GetInstance().HookEvent("initialize", [&]() { result->Initialize(); });
-					ServerInterfaceLayer::GetInstance().HookEvent("update", [&]() { result->Update(); });
-					ServerInterfaceLayer::GetInstance().HookEvent("render", [&]() { result->Render(); });
-					ServerInterfaceLayer::GetInstance().HookEvent("uninitialize", [&]() { result->Uninitialize(); });
+					ServerInterfaceLayer::GetInstance().HookEvent("preinitialize", [&]() { Preinitialize(); });
+					ServerInterfaceLayer::GetInstance().HookEvent("initialize", [&]() { Initialize(); });
+					ServerInterfaceLayer::GetInstance().HookEvent("update", [&]() { Update(); });
+					ServerInterfaceLayer::GetInstance().HookEvent("render", [&]() { Render(); });
+					ServerInterfaceLayer::GetInstance().HookEvent("uninitialize", [&]() { Uninitialize(); });
 
 					return std::move(result);
 				}();

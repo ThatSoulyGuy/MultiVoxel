@@ -9,7 +9,7 @@ using namespace MultiVoxel::Independent::Network;
 
 namespace MultiVoxel::Client::Packet
 {
-    class ReplicationReceiver : public PacketReceiver
+    class ReplicationReceiver final : public PacketReceiver
     {
 
     public:
@@ -28,28 +28,25 @@ namespace MultiVoxel::Client::Packet
             while (spawnCount--)
             {
                 NetworkId id;
-                std::string name;
 
-                archive(id, name);
+                std::string gameObjectName;
+                archive(id, gameObjectName);
 
-                auto gameObject = GameObject::Create(IndexedString(name));
+                auto gameObject = GameObject::Create(IndexedString(gameObjectName));
 
                 gameObject->SetNetworkId(id);
-
                 gameObject->RemoveComponent<Transform>();
 
                 GameObjectManager::GetInstance().Register(gameObject);
 
-                localTree.AddNode(id, name, 0);
+                localTree.AddNode(id, gameObjectName, 0);
             }
 
-            uint32_t deletionCount;
-            archive(deletionCount);
+            uint32_t deletionCount;  archive(deletionCount);
 
             while (deletionCount--)
             {
-                NetworkId id;
-                archive(id);
+                NetworkId id; archive(id);
 
                 GameObjectManager::GetInstance().Unregister(id);
 
@@ -62,34 +59,59 @@ namespace MultiVoxel::Client::Packet
             while (additionCount--)
             {
                 NetworkId parentId, childId;
-                
                 archive(parentId, childId);
 
-                auto optionalParent = GameObjectManager::GetInstance().Get(parentId);
-                auto optionalChild = GameObjectManager::GetInstance().Get(childId);
-
-                if (optionalParent && optionalChild)
-                    optionalParent.value()->AddChild(optionalChild.value());
+                if (auto optP = GameObjectManager::GetInstance().Get(parentId))
+                {
+                    if (auto optC = GameObjectManager::GetInstance().Get(childId))
+                        optP.value()->AddChild(optC.value());
+                }
 
                 localTree.AddEdge(parentId, childId);
             }
 
             uint32_t removalCount;
-            
             archive(removalCount);
 
             while (removalCount--)
             {
                 NetworkId parentId, childId;
-                
                 archive(parentId, childId);
 
-                auto optionalParent = GameObjectManager::GetInstance().Get(parentId);
-
-                if (optionalParent)
-                    optionalParent.value()->RemoveChild(childId);
+                if (auto optP = GameObjectManager::GetInstance().Get(parentId))
+                    optP.value()->RemoveChild(childId);
 
                 localTree.RemoveEdge(parentId, childId);
+            }
+
+            uint32_t componentAdditionCount;
+            archive(componentAdditionCount);
+
+            while (componentAdditionCount--)
+            {
+                NetworkId objectId;
+
+                std::string componentTypeName;
+
+                archive(objectId, componentTypeName);
+
+                if (auto optionalGameObject = GameObjectManager::GetInstance().Get(objectId))
+                    optionalGameObject.value()->AddComponentDynamic(ComponentFactory::Create(componentTypeName));
+            }
+
+            uint32_t componentRemovalCount;
+            archive(componentRemovalCount);
+
+            while (componentRemovalCount--)
+            {
+                NetworkId objectId;
+
+                std::string componentTypeName;
+
+                archive(objectId, componentTypeName);
+
+                if (auto optGO = GameObjectManager::GetInstance().Get(objectId))
+                    optGO.value()->RemoveComponentDynamic(ComponentFactory::Create(componentTypeName));
             }
 
             uint32_t total;
@@ -110,22 +132,20 @@ namespace MultiVoxel::Client::Packet
 
                 archive(id, componentName);
 
-                auto optionalGameObject = GameObjectManager::GetInstance().Get(id);
+                if (auto optionalGameObject = GameObjectManager::GetInstance().Get(id))
+                {
+                    auto component = ComponentFactory::Create(componentName);
 
-                if (!optionalGameObject)
-                    continue;
+                    optionalGameObject.value()->AddComponentDynamic(component);
 
-                auto component = ComponentFactory::Create(componentName);
-                optionalGameObject.value()->AddComponentDynamic(component);
-
-                if (auto networkComponent = dynamic_cast<INetworkSerializable*>(component.get()))
-                    networkComponent->Deserialize(archive);
+                    if (auto networkComponent = dynamic_cast<INetworkSerializable*>(component.get()))
+                        networkComponent->Deserialize(archive);
+                }
             }
 
             if (!localTree.Equals(LightTree::BuildFromManager()))
             {
                 RpcClient::GetInstance().Reload();
-
                 localTree.Clear();
             }
         }
@@ -133,7 +153,7 @@ namespace MultiVoxel::Client::Packet
         struct Node
         {
             IndexedString name;
-            NetworkId parent;
+            NetworkId parent{};
 
             std::vector<NetworkId> children;
 
@@ -142,7 +162,7 @@ namespace MultiVoxel::Client::Packet
                 return name == o.name && parent == o.parent && children == o.children;
             }
 
-            bool operator!=(Node const& o)
+            bool operator!=(Node const& o) const
             {
                 return !(*this == o);
             }
@@ -173,7 +193,7 @@ namespace MultiVoxel::Client::Packet
             {
                 auto& children = nodes[parentId].children;
 
-                children.erase(std::remove(children.begin(), children.end(), childId), children.end());
+                std::erase(children, childId);
 
                 nodes[childId].parent = 0;
             }
@@ -213,7 +233,7 @@ namespace MultiVoxel::Client::Packet
 
                 for (auto& [id, node] : result.nodes)
                 {
-                    if (node.parent && result.nodes.count(node.parent))
+                    if (node.parent && result.nodes.contains(node.parent))
                         result.nodes[node.parent].children.push_back(id);
                 }
 
@@ -224,7 +244,7 @@ namespace MultiVoxel::Client::Packet
 
             std::unordered_map<NetworkId, Node> nodes;
 
-            friend class std::hash<MultiVoxel::Client::Packet::ReplicationReceiver::LightTree>;
+            friend class std::hash<LightTree>;
 
         } localTree;
     };
@@ -232,11 +252,6 @@ namespace MultiVoxel::Client::Packet
 
 namespace std
 {
-    inline void hash_combine(std::size_t& seed, std::size_t h) noexcept
-    {
-        seed ^= h + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-    }
-
     template<>
     struct hash<MultiVoxel::Client::Packet::ReplicationReceiver::Node>
     {
@@ -244,12 +259,12 @@ namespace std
         {
             size_t seed = 0;
 
-            hash_combine(seed, std::hash<IndexedString>()(n.name));
+            HashCombine(seed, std::hash<IndexedString>()(n.name));
 
-            hash_combine(seed, std::hash<NetworkId>()(n.parent));
+            HashCombine(seed, std::hash<NetworkId>()(n.parent));
 
-            for (auto cid : n.children)
-                hash_combine(seed, std::hash<NetworkId>()(cid));
+            for (const auto childId : n.children)
+                HashCombine(seed, std::hash<NetworkId>()(childId));
 
             return seed;
         }
@@ -264,9 +279,9 @@ namespace std
 
             for (auto const& [id, node] : t.nodes)
             {
-                hash_combine(seed, std::hash<NetworkId>()(id));
+                HashCombine(seed, std::hash<NetworkId>()(id));
 
-                hash_combine(seed, std::hash<MultiVoxel::Client::Packet::ReplicationReceiver::Node>()(node));
+                HashCombine(seed, std::hash<MultiVoxel::Client::Packet::ReplicationReceiver::Node>()(node));
             }
 
             return seed;

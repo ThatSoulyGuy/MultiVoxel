@@ -13,27 +13,19 @@ namespace MultiVoxel::Independent::Network
 
     public:
 
-        static std::unique_ptr<PeerConnection> Create(HSteamNetConnection conn, ISteamNetworkingSockets* sockets, HSteamNetPollGroup pollGroup)
-        {
-            auto result = std::unique_ptr<PeerConnection>(new PeerConnection(conn, sockets));
-
-            sockets->SetConnectionPollGroup(conn, pollGroup);
-
-            return result;
-        }
-
         ~PeerConnection()
         {
             if (connection != k_HSteamNetConnection_Invalid)
                 sockets->CloseConnection(connection, 0, nullptr, false);
         }
 
-        HSteamNetConnection GetHandle() const 
+        [[nodiscard]]
+        HSteamNetConnection GetHandle() const
         {
             return connection;
         }
 
-        void Send(const Message& msg)
+        void Send(const Message& msg) const
         {
             std::vector<uint8_t> buf;
 
@@ -44,16 +36,14 @@ namespace MultiVoxel::Independent::Network
 
         void EnqueueReceived(SteamNetworkingMessage_t* incoming)  
         {  
-            const uint8_t* data = static_cast<const uint8_t*>(incoming->m_pData);  
-            
-            size_t bytes = incoming->m_cbSize;  
+            const auto* data = static_cast<const uint8_t*>(incoming->m_pData);
 
-            if (bytes >= 1)  
-            {  
-                Message::Type type = static_cast<Message::Type>(data[0]);  
+            if (const size_t bytes = incoming->m_cbSize; bytes >= 1)
+            {
+                const auto type = static_cast<Message::Type>(data[0]);
 
-                std::vector<uint8_t> payload(data + 1, data + bytes);  
-                std::lock_guard<std::mutex> lock(mutex);  
+                const std::vector payload(data + 1, data + bytes);
+                std::lock_guard lock(mutex);
 
                 messageQueue.emplace(Message::Create(type, payload.data(), payload.size(), true));  
             }  
@@ -63,7 +53,7 @@ namespace MultiVoxel::Independent::Network
 
         bool Receive(Message& outMsg)
         {
-            std::lock_guard<std::mutex> lock(mutex);
+            std::lock_guard lock(mutex);
 
             if (messageQueue.empty())
                 return false;
@@ -74,12 +64,24 @@ namespace MultiVoxel::Independent::Network
             return true;
         }
 
+        static std::unique_ptr<PeerConnection> Create(const HSteamNetConnection connection, ISteamNetworkingSockets* sockets, const HSteamNetPollGroup pollGroup)
+        {
+            auto result = std::unique_ptr<PeerConnection>(new PeerConnection());
+
+            result->connection = connection;
+            result->sockets = sockets;
+
+            sockets->SetConnectionPollGroup(connection, pollGroup);
+
+            return result;
+        }
+
     private:
 
-        PeerConnection(HSteamNetConnection conn, ISteamNetworkingSockets* sockets) : connection(conn), sockets(sockets) { }
+        PeerConnection() = default;
 
-        HSteamNetConnection connection;
-        ISteamNetworkingSockets* sockets;
+        HSteamNetConnection connection = 0;
+        ISteamNetworkingSockets* sockets = nullptr;
         std::mutex mutex;
         std::queue<Message> messageQueue;
     };

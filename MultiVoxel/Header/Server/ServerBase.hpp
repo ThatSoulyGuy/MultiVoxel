@@ -6,7 +6,6 @@
 #include <sstream>
 #include <cereal/cereal.hpp>
 #include <cereal/archives/binary.hpp>
-#include <cereal/types/string.hpp>
 #include "Independent/Core/Settings.hpp"
 #include "Independent/Network/NetworkManager.hpp"
 #include "Independent/Network/PacketReceiver.hpp"
@@ -30,7 +29,7 @@ namespace MultiVoxel::Server
         ServerBase& operator=(const ServerBase&) = delete;
         ServerBase& operator=(ServerBase&&) = delete;
 
-        bool Initialize(uint32_t port)
+        bool Initialize(const uint32_t port)
         {
             serverPort = port;
 
@@ -48,7 +47,7 @@ namespace MultiVoxel::Server
                     {
                         const auto& buffer = msg.GetBuffer();
 
-                        std::string rawData{ reinterpret_cast<const char*>(buffer.data()), buffer.size() };
+                        const std::string rawData{ reinterpret_cast<const char*>(buffer.data()), buffer.size() };
 
                         std::istringstream is(rawData);
 
@@ -60,7 +59,7 @@ namespace MultiVoxel::Server
                         archive(name, data);
 
                         if (name == "RpcChannel")
-                            RpcReceiver::Create().HandleRpc(peer, data);
+                            RpcReceiver::HandleRpc(peer, data);
 
                         for (auto* receiver : packetReceiverList)
                             receiver->OnPacketReceived(name, data);
@@ -104,11 +103,11 @@ namespace MultiVoxel::Server
 
                     while (sender->SendPacket(packetName, packetData))
                     {
-                        std::ostringstream os;
-                        cereal::BinaryOutputArchive oa(os);
+                        std::ostringstream stream;
+                        cereal::BinaryOutputArchive archive(stream);
 
-                        oa(packetName, packetData);
-                        auto const& buffer = os.str();
+                        archive(packetName, packetData);
+                        auto const& buffer = stream.str();
 
                         networkManager.Broadcast(Message::Create(Message::Type::Custom, buffer.data(), buffer.size(), true));
                     }
@@ -119,9 +118,7 @@ namespace MultiVoxel::Server
                 ServerInterfaceLayer::GetInstance().CallEvent("update");
                 ServerInterfaceLayer::GetInstance().CallEvent("render");
 
-                auto elapsed = duration_cast<milliseconds>(steady_clock::now() - start);
-
-                if (elapsed < tickInterval)
+                if (auto elapsed = duration_cast<milliseconds>(steady_clock::now() - start); elapsed < tickInterval)
                     std::this_thread::sleep_for(tickInterval - elapsed);
             }
         }
@@ -171,7 +168,7 @@ namespace MultiVoxel::Server
 
         bool isInitialized = false;
 
-        std::unordered_map<std::string, HSteamNetConnection> players;
+        std::unordered_map<std::string, HSteamNetConnection> players = {};
 
         std::vector<PacketSender*> packetSenderList;
         std::vector<PacketReceiver*> packetReceiverList;

@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <vector>
-#include <cstddef>
 #include <cstring>
 
 namespace MultiVoxel::Independent::Network
@@ -24,16 +23,19 @@ namespace MultiVoxel::Independent::Network
 
         Message() = default;
 
+        [[nodiscard]]
         Type GetType() const
         {
             return type;
         }
 
+        [[nodiscard]]
         const std::vector<uint8_t>& GetBuffer() const
         {
             return buffer;
         }
 
+        [[nodiscard]]
         bool IsReliable() const
         {
             return reliable;
@@ -48,7 +50,7 @@ namespace MultiVoxel::Independent::Network
                 std::memcpy(out.data() + 1, buffer.data(), buffer.size());
         }
 
-        static Message Create(Type type, const void* payload, size_t size, bool reliable = true)
+        static Message Create(const Type type, const void* payload, const size_t size, const bool reliable = true)
         {
             Message result = { };
 

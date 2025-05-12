@@ -15,17 +15,15 @@ namespace MultiVoxel::Independent::Network
 
         using HandlerFn = std::function<void(PeerConnection&, const Message&)>;
 
-        void RegisterHandler(Message::Type type, HandlerFn handler)
+        void RegisterHandler(const Message::Type type, HandlerFn handler)
         {
             handlerMap[type] = std::move(handler);
         }
 
         void Dispatch(PeerConnection& peer, const Message& msg)
         {
-            auto it = handlerMap.find(msg.GetType());
-
-            if (it != handlerMap.end())
-                it->second(peer, msg);
+            if (const auto iterator = handlerMap.find(msg.GetType()); iterator != handlerMap.end())
+                iterator->second(peer, msg);
         }
 
     private:

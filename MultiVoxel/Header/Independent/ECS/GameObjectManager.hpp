@@ -44,7 +44,7 @@ namespace MultiVoxel::Independent::ECS
 			gameObjectMap.erase(name);
 		}
 
-		void Unregister(NetworkId id)
+		void Unregister(const NetworkId id)
 		{
 			if (!networkMap.contains(id))
 			{
@@ -57,9 +57,14 @@ namespace MultiVoxel::Independent::ECS
 			networkMap.erase(id);
 		}
 
-		bool Has(const IndexedString& name) override
+		bool Has(const IndexedString& name) const override
 		{
 			return gameObjectMap.contains(name);
+		}
+
+		bool Has(const NetworkId id) const
+		{
+			return networkMap.contains(id);
 		}
 
 		std::optional<std::shared_ptr<GameObject>> Get(const IndexedString& name) override
@@ -84,24 +89,24 @@ namespace MultiVoxel::Independent::ECS
 			return networkMap.contains(id) ? std::make_optional<std::shared_ptr<GameObject>>(networkMap[id]) : std::nullopt;
 		}
 
-		std::vector<std::shared_ptr<GameObject>> GetAll() override
+		std::vector<std::shared_ptr<GameObject>> GetAll() const override
 		{
 			std::vector<std::shared_ptr<GameObject>> result(gameObjectMap.size());
 
-			std::transform(gameObjectMap.begin(), gameObjectMap.end(), result.begin(), [](const auto& pair) { return pair.second; });
+			std::ranges::transform(gameObjectMap, result.begin(), [](const auto& pair) { return pair.second; });
 
 			return result;
 		}
 
 		void Update()
 		{
-			for (auto& [name, gameObject] : gameObjectMap)
+			for (const auto& gameObject: gameObjectMap | std::views::values)
 				gameObject->Update();
 		}
 
 		void Render()
 		{
-			for (auto& [name, gameObject] : gameObjectMap)
+			for (const auto& gameObject: gameObjectMap | std::views::values)
 				gameObject->Render();
 		}
 

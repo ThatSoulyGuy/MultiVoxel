@@ -363,12 +363,14 @@ namespace MultiVoxel::Independent::Math
 			return data.end();
 		}
 
-		constexpr size_t Rows() const
+		[[nodiscard]]
+		static constexpr size_t Rows()
 		{
 			return R;
 		}
 
-		constexpr size_t Columns() const
+		[[nodiscard]]
+		static constexpr size_t Columns()
 		{
 			return C;
 		}
@@ -377,8 +379,11 @@ namespace MultiVoxel::Independent::Math
 
 		std::array<std::array<T, R>, C> data;
 
-		friend bool operator==(const Matrix<T, R, C>& lhs, const Matrix<T, R, C>& rhs);
-		friend bool operator!=(const Matrix<T, R, C>& lhs, const Matrix<T, R, C>& rhs);
+		template <Arithmetic U, size_t X, size_t V>
+		friend bool operator==(const Matrix<U, X, V>& lhs, const Matrix<U, X, V>& rhs);
+
+		template <Arithmetic U, size_t X, size_t V>
+		friend bool operator!=(const Matrix<U, X, V>& lhs, const Matrix<U, X, V>& rhs);
 	};
 
 	template <Arithmetic T, size_t R, size_t C>
@@ -428,18 +433,18 @@ namespace MultiVoxel::Independent::Math
 	}
 }
 
+inline void HashCombine(std::size_t& seed, std::size_t value) noexcept
+{
+	constexpr std::size_t magic = 0x9e3779b97f4a7c15ULL;
+	seed ^= value + magic + (seed << 6) + (seed >> 2);
+}
+
 namespace std
 {
-	inline void HashCombine(std::size_t& seed, std::size_t value) noexcept
+	template <Arithmetic T, size_t R, size_t C>
+	struct hash<Matrix<T, R, C>>
 	{
-		constexpr std::size_t magic = 0x9e3779b97f4a7c15ULL;
-		seed ^= value + magic + (seed << 6) + (seed >> 2);
-	}
-
-	template <MultiVoxel::Independent::Math::Arithmetic T, size_t R, size_t C>
-	struct hash<MultiVoxel::Independent::Math::Matrix<T, R, C>>
-	{
-		std::size_t operator()(const MultiVoxel::Independent::Math::Matrix<T, R, C>& m) const noexcept
+		std::size_t operator()(const Matrix<T, R, C>& m) const noexcept
 		{
 			std::size_t result = 0;
 
@@ -455,17 +460,17 @@ namespace std
 			return result;
 		}
 	};
-}
 
-template <MultiVoxel::Independent::Math::Arithmetic T, size_t R, size_t C>
-struct std::formatter<MultiVoxel::Independent::Math::Matrix<T, R, C>> : std::formatter<std::string>
-{
-	auto format(const MultiVoxel::Independent::Math::Matrix<T, R, C>& mat, std::format_context& ctx)
+	template <Arithmetic T, size_t R, size_t C>
+	struct formatter<Matrix<T, R, C>> : std::formatter<std::string>
 	{
-		std::ostringstream oss;
+		auto format(const Matrix<T, R, C>& mat, std::format_context& ctx)
+		{
+			std::ostringstream oss;
 
-		oss << mat;
+			oss << mat;
 
-		return std::formatter<std::string>::format(oss.str(), ctx);
-	}
-};
+			return std::formatter<std::string>::format(oss.str(), ctx);
+		}
+	};
+}

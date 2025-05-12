@@ -41,7 +41,7 @@ namespace MultiVoxel::Client::Render
 			shaderMap.erase(name);
 		}
 
-		bool Has(const IndexedString& name) override
+		bool Has(const IndexedString& name) const override
 		{
 			return shaderMap.contains(name);
 		}
@@ -57,7 +57,7 @@ namespace MultiVoxel::Client::Render
 			return std::make_optional(shaderMap[name]);
 		}
 
-		std::vector<std::shared_ptr<Shader>> GetAll() override
+		std::vector<std::shared_ptr<Shader>> GetAll() const override
 		{
 			std::vector<std::shared_ptr<Shader>> result(shaderMap.size());
 

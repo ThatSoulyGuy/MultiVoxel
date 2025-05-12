@@ -1,11 +1,10 @@
 ﻿#include "Client/ClientApplication.hpp"
 #include "Client/ClientBase.hpp"
 #include "Independent/Core/Settings.hpp"
-#include "Independent/ECS/GameObjectManager.hpp"
 #include "Server/ServerBase.hpp"
 #include "Server/ServerApplication.hpp"
 
-int main(void)
+int main()
 {
     std::cout << "Run as (s)erver or (c)lient? ";
 

@@ -51,27 +51,27 @@ namespace MultiVoxel::Independent::Network
             }
         }
 
-        void Broadcast(const Message& message)
+        void Broadcast(const Message& message) const
         {
             for (auto& peer : peerList)
                 peer->Send(message);
         }
 
-        void FlushOutgoing()
+        void FlushOutgoing() const
         {
             sockets->RunCallbacks();
         }
 
-        bool StartServer(uint16_t port)
+        bool StartServer(const uint16_t port)
         {
-            SteamNetworkingIPAddr address;
+            SteamNetworkingIPAddr address = { };
 
             address.Clear();
             address.SetIPv4(0, port);
 
             SteamNetworkingConfigValue_t opt = {};
 
-            opt.SetPtr(k_ESteamNetworkingConfig_Callback_ConnectionStatusChanged, (void*)NetworkManager::OnSteamNetConnectionStatusChanged);
+            opt.SetPtr(k_ESteamNetworkingConfig_Callback_ConnectionStatusChanged, (void*)OnSteamNetConnectionStatusChanged);
 
             listenerSocket = sockets->CreateListenSocketIP(address, 1, &opt);
 
@@ -80,7 +80,7 @@ namespace MultiVoxel::Independent::Network
 
         bool ConnectToServer(const std::string& addressString, uint16_t port)
         {
-            SteamNetworkingIPAddr address;
+            SteamNetworkingIPAddr address = { };
 
             SteamNetworkingIPAddr_ParseString(&address, addressString.c_str());
 
@@ -88,14 +88,14 @@ namespace MultiVoxel::Independent::Network
 
             SteamNetworkingConfigValue_t opt = {};
 
-            opt.SetPtr(k_ESteamNetworkingConfig_Callback_ConnectionStatusChanged, (void*)NetworkManager::OnSteamNetConnectionStatusChanged);
+            opt.SetPtr(k_ESteamNetworkingConfig_Callback_ConnectionStatusChanged, (void*)OnSteamNetConnectionStatusChanged);
 
-            HSteamNetConnection connection = sockets->ConnectByIPAddress(address, 1, &opt);
+            const HSteamNetConnection connection = sockets->ConnectByIPAddress(address, 1, &opt);
 
             if (connection == k_HSteamNetConnection_Invalid)
                 return false;
-            else
-                sockets->SetConnectionPollGroup(connection, pollGroup);
+
+            sockets->SetConnectionPollGroup(connection, pollGroup);
 
             peerList.push_back(PeerConnection::Create(connection, sockets, pollGroup));
 
@@ -107,7 +107,7 @@ namespace MultiVoxel::Independent::Network
             return messageDispatcher;
         }
 
-        ISteamNetworkingSockets* GetSockets()
+        ISteamNetworkingSockets* GetSockets() const
         {
             return sockets;
         }
@@ -187,7 +187,7 @@ namespace MultiVoxel::Independent::Network
 
         static void OnDebugOutput(ESteamNetworkingSocketsDebugOutputType eType, const char* message)
         {
-            std::lock_guard<std::mutex> lock(logMutex);
+            std::lock_guard lock(logMutex);
 
             switch (eType)
             {
@@ -198,6 +198,9 @@ namespace MultiVoxel::Independent::Network
                 case k_ESteamNetworkingSocketsDebugOutputType_Warning:   std::cerr << "[GNS][WARNING] ";   break;
                 case k_ESteamNetworkingSocketsDebugOutputType_Msg:       std::cerr << "[GNS][INFO] ";      break;
                 case k_ESteamNetworkingSocketsDebugOutputType_Verbose:   std::cerr << "[GNS][DEBUG] ";     break;
+
+                default:
+                    break;
             }
 
             std::cerr << message << "\n";
@@ -226,13 +229,9 @@ namespace MultiVoxel::Independent::Network
 
             case k_ESteamNetworkingConnectionState_ClosedByPeer:
             case k_ESteamNetworkingConnectionState_ProblemDetectedLocally:
-                instance->peerList.erase(
-                    std::remove_if(
-                        instance->peerList.begin(),
-                        instance->peerList.end(),
-                        [&](auto& p) { return p->GetHandle() == info->m_hConn; }
-                    ),
-                    instance->peerList.end()
+                std::erase_if(
+                    instance->peerList,
+                    [&](auto& p) { return p->GetHandle() == info->m_hConn; }
                 );
                 std::cout << "Client disconnected (handle=" << info->m_hConn << ")\n";
                 break;

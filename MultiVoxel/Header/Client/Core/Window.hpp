@@ -38,9 +38,9 @@ namespace MultiVoxel::Client::Core
 
 			glfwMakeContextCurrent(handle);
 
-			glfwSetFramebufferSizeCallback(handle, [](GLFWwindow*, int width, int height) { glViewport(0, 0, width, height); });
+			glfwSetFramebufferSizeCallback(handle, [](GLFWwindow*, const int width, const int height) { glViewport(0, 0, width, height); });
 
-			if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+			if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress)))
 				throw std::runtime_error("Failed to initialize GLAD!");
 
 			glfwShowWindow(handle);
@@ -48,33 +48,36 @@ namespace MultiVoxel::Client::Core
 			glEnable(GL_DEPTH_TEST);
 		}
 
+		[[nodiscard]]
 		bool IsRunning() const
 		{
 			return !glfwWindowShouldClose(handle);
 		}
 
-		void Clear()
+		static void Clear()
 		{
 			glClearColor(0.0f, 0.45f, 0.75f, 1.0f);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		}
 
-		void Present()
+		void Present() const
 		{
 			glfwPollEvents();
 			glfwSwapBuffers(handle);
 		}
 
+		[[nodiscard]]
 		std::string GetTitle() const
 		{
 			return glfwGetWindowTitle(handle);
 		}
 
-		void SetTitle(const std::string& title)
+		void SetTitle(const std::string& title) const
 		{
 			glfwSetWindowTitle(handle, title.c_str());
 		}
 
+		[[nodiscard]]
 		Vector<int, 2> GetDimensions() const
 		{
 			int width, height;
@@ -84,11 +87,12 @@ namespace MultiVoxel::Client::Core
 			return { width, height };
 		}
 
-		void SetDimensions(const Vector<int, 2>& dimensions)
+		void SetDimensions(const Vector<int, 2>& dimensions) const
 		{
 			glfwSetWindowSize(handle, dimensions.x(), dimensions.y());
 		}
 
+		[[nodiscard]]
 		Vector<int, 2> GetPosition() const
 		{
 			int x, y;
@@ -98,18 +102,19 @@ namespace MultiVoxel::Client::Core
 			return { x, y };
 		}
 
+		[[nodiscard]]
 		GLFWwindow* GetHandle() const
 		{
 			return handle;
 		}
 
-		void Uninitialize()
+		void Uninitialize() const
 		{
 			glfwDestroyWindow(handle);
 			glfwTerminate();
 		}
 
-		void SetPosition(const Vector<int, 2>& position)
+		void SetPosition(const Vector<int, 2>& position) const
 		{
 			glfwSetWindowPos(handle, position.x(), position.y());
 		}

@@ -1,8 +1,8 @@
 #pragma once
 
+#include <atomic>
 #include <memory>
 #include <string>
-#include <cereal/archives/binary.hpp>
 #include <cereal/cereal.hpp>
 
 namespace MultiVoxel::Independent::ECS
@@ -26,9 +26,13 @@ namespace MultiVoxel::Independent::ECS
 		virtual void Deserialize(cereal::BinaryInputArchive& ar) = 0;
 
 		virtual void MarkDirty() = 0;
+
+		[[nodiscard]]
 		virtual bool IsDirty() const = 0;
+
 		virtual void ClearDirty() = 0;
 
+		[[nodiscard]]
 		virtual std::string GetComponentTypeName() const = 0;
 	};
 
@@ -39,12 +43,15 @@ namespace MultiVoxel::Independent::ECS
 
 	public:
 
+		virtual ~Component() = default;
+
 		virtual void Initialize() { }
 		
 		virtual void Update() { }
 
 		virtual void Render() { }
 
+		[[nodiscard]]
 		std::shared_ptr<GameObject> GetGameObject() const
 		{
 			return gameObject.lock();

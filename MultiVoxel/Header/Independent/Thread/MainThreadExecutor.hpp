@@ -20,14 +20,14 @@ namespace MultiVoxel::Independent::Thread
 
         static void ExecuteTasks()
         {
-            auto& q = GetQueue();
+            auto& queue = GetQueue();
 
             std::lock_guard lock(GetMutex());
 
-            while (!q.empty())
+            while (!queue.empty())
             {
-                q.front()();
-                q.pop();
+                queue.front()();
+                queue.pop();
             }
         }
 
@@ -36,13 +36,15 @@ namespace MultiVoxel::Independent::Thread
         static std::queue<std::function<void()>>& GetQueue()
         {
             static std::queue<std::function<void()>> queue;
+
             return queue;
         }
 
         static std::mutex& GetMutex()
         {
-            static std::mutex m;
-            return m;
+            static std::mutex mutex;
+
+            return mutex;
         }
     };
 }

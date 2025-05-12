@@ -57,12 +57,13 @@ namespace MultiVoxel::Independent::Math
             dirty = true;
         }
 
+        [[nodiscard]]
         Vector<float, 3> GetLocalPosition() const
         {
             return localPosition;
         }
 
-        void SetLocalPosition(const Vector<float, 3>& value, bool update = true)
+        void SetLocalPosition(const Vector<float, 3>& value, const bool update = true)
         {
             localPosition = value;
 
@@ -75,6 +76,7 @@ namespace MultiVoxel::Independent::Math
             dirty = true;
         }
 
+        [[nodiscard]]
         Vector<float, 3> GetLocalRotation() const
         {
             return localRotation;
@@ -101,12 +103,13 @@ namespace MultiVoxel::Independent::Math
             dirty = true;
         }
 
+        [[nodiscard]]
         Vector<float, 3> GetLocalScale() const
         {
             return localScale;
         }
 
-        void SetLocalScale(const Vector<float, 3>& value, bool update = true)
+        void SetLocalScale(const Vector<float, 3>& value, const bool update = true)
         {
             localScale = value;
 
@@ -119,91 +122,91 @@ namespace MultiVoxel::Independent::Math
             dirty = true;
         }
 
+        [[nodiscard]]
         Vector<float, 3> GetWorldPosition() const
         {
-            auto M = GetModelMatrix();
+            auto model = GetModelMatrix();
 
-            return { M[3][0], M[3][1], M[3][2] };
+            return { model[3][0], model[3][1], model[3][2] };
         }
 
+        [[nodiscard]]
         Vector<float, 3> GetWorldScale() const
         {
-            auto M = GetModelMatrix();
+            auto model = GetModelMatrix();
 
-            auto length = [](float x, float y, float z)
-                {
-                    return std::sqrt(x * x + y * y + z * z);
-                };
+            auto length = [](const float x, const float y, const float z)
+            {
+                return std::sqrt(x * x + y * y + z * z);
+            };
 
             return
             {
-                length(M[0][0], M[0][1], M[0][2]),
-                length(M[1][0], M[1][1], M[1][2]),
-                length(M[2][0], M[2][1], M[2][2])
+                length(model[0][0], model[0][1], model[0][2]),
+                length(model[1][0], model[1][1], model[1][2]),
+                length(model[2][0], model[2][1], model[2][2])
             };
         }
 
+        [[nodiscard]]
         Vector<float, 3> GetForward() const
         {
-            auto M = GetModelMatrix();
+            auto model = GetModelMatrix();
 
-            Vector<float, 3> f = { M[2][0], M[2][1], M[2][2] };
-
-            return Vector<float, 3>::Normalize(f);
+            return Vector<float, 3>::Normalize({ model[2][0], model[2][1], model[2][2] });
         }
 
+        [[nodiscard]]
         Vector<float, 3> GetRight() const
         {
-            auto M = GetModelMatrix();
+            auto model = GetModelMatrix();
 
-            Vector<float, 3> r = { M[0][0], M[0][1], M[0][2] };
-
-            return Vector<float, 3>::Normalize(r);
+            return Vector<float, 3>::Normalize({ model[0][0], model[0][1], model[0][2] });
         }
 
+        [[nodiscard]]
         Vector<float, 3> GetUp() const
         {
-            auto M = GetModelMatrix();
+            auto model = GetModelMatrix();
 
-            Vector<float, 3> u = { M[1][0], M[1][1], M[1][2] };
-
-            return Vector<float, 3>::Normalize(u);
+            return Vector<float, 3>::Normalize({ model[1][0], model[1][1], model[1][2] });
         }
 
+        [[nodiscard]]
         Vector<float, 3> GetWorldRotation() const
         {
-            auto M = GetModelMatrix();
+            auto model = GetModelMatrix();
 
             Vector<float, 3> sc = GetWorldScale();
 
             if (std::fabs(sc.x()) > 1e-6f)
-                M[0][0] /= sc.x(); M[0][1] /= sc.x(); M[0][2] /= sc.x();
+                model[0][0] /= sc.x(); model[0][1] /= sc.x(); model[0][2] /= sc.x();
 
             if (std::fabs(sc.y()) > 1e-6f)
-                M[1][0] /= sc.y(); M[1][1] /= sc.y(); M[1][2] /= sc.y();
+                model[1][0] /= sc.y(); model[1][1] /= sc.y(); model[1][2] /= sc.y();
 
             if (std::fabs(sc.z()) > 1e-6f)
-                M[2][0] /= sc.z(); M[2][1] /= sc.z(); M[2][2] /= sc.z();
+                model[2][0] /= sc.z(); model[2][1] /= sc.z(); model[2][2] /= sc.z();
 
 
             float pitch, yaw, roll;
 
-            if (std::fabs(M[0][0]) < 1e-6f && std::fabs(M[1][0]) < 1e-6f)
+            if (std::fabs(model[0][0]) < 1e-6f && std::fabs(model[1][0]) < 1e-6f)
             {
-                pitch = std::atan2(-M[2][0], M[2][2]);
+                pitch = std::atan2(-model[2][0], model[2][2]);
                 yaw = 0.0f;
-                roll = std::atan2(-M[1][2], M[1][1]);
+                roll = std::atan2(-model[1][2], model[1][1]);
             }
             else
             {
-                yaw = std::atan2(M[1][0], M[0][0]);
-                pitch = std::atan2(-M[2][0], std::sqrt(M[2][1] * M[2][1] + M[2][2] * M[2][2]));
-                roll = std::atan2(M[2][1], M[2][2]);
+                yaw = std::atan2(model[1][0], model[0][0]);
+                pitch = std::atan2(-model[2][0], std::sqrt(model[2][1] * model[2][1] + model[2][2] * model[2][2]));
+                roll = std::atan2(model[2][1], model[2][2]);
             }
 
-            const float rad2deg = 180.0f / std::numbers::pi_v<float>;
+            constexpr float rad2deg = 180.0f / std::numbers::pi_v<float>;
 
-            return Vector<float, 3>{ pitch* rad2deg, yaw* rad2deg, roll* rad2deg };
+            return Vector<float, 3>{ pitch * rad2deg, yaw * rad2deg, roll * rad2deg };
         }
 
         void AddOnPositionChangedCallback(const std::function<void(Vector<float, 3>)>& function)
@@ -221,6 +224,7 @@ namespace MultiVoxel::Independent::Math
             onScaleUpdated.push_back(function);
         }
 
+        [[nodiscard]]
         std::optional<std::weak_ptr<Transform>> GetParent() const
         {
             return parent;
@@ -234,35 +238,34 @@ namespace MultiVoxel::Independent::Math
                 parent = std::make_optional<std::weak_ptr<Transform>>(newParent);
         }
 
+        [[nodiscard]]
         Matrix<float, 4, 4> GetModelMatrix() const
         {
-            auto T = Matrix<float, 4, 4>::Translation(localPosition);
-            auto RX = Matrix<float, 4, 4>::RotationX(localRotation.x() * (std::numbers::pi_v<float> / 180.0f));
-            auto RY = Matrix<float, 4, 4>::RotationY(localRotation.y() * (std::numbers::pi_v<float> / 180.0f));
-            auto RZ = Matrix<float, 4, 4>::RotationZ(localRotation.z() * (std::numbers::pi_v<float> / 180.0f));
-            auto S = Matrix<float, 4, 4>::Scale(localScale);
+            const auto translation = Matrix<float, 4, 4>::Translation(localPosition);
+            const auto rotationX = Matrix<float, 4, 4>::RotationX(localRotation.x() * (std::numbers::pi_v<float> / 180.0f));
+            const auto rotationY = Matrix<float, 4, 4>::RotationY(localRotation.y() * (std::numbers::pi_v<float> / 180.0f));
+            const auto rotationZ = Matrix<float, 4, 4>::RotationZ(localRotation.z() * (std::numbers::pi_v<float> / 180.0f));
+            const auto scale = Matrix<float, 4, 4>::Scale(localScale);
 
-            Matrix<float, 4, 4> localMatrix = T * RZ * RY * RX * S;
+            const Matrix<float, 4, 4> localMatrix = translation * rotationZ * rotationY * rotationX * scale;
 
             if (parent.has_value())
             {
-                auto parentPtr = parent.value().lock();
-
-                if (parentPtr)
+	            if (const auto parentPtr = parent.value().lock())
                     return parentPtr->GetModelMatrix() * localMatrix;
             }
 
             return localMatrix;
         }
 
-        void Serialize(cereal::BinaryOutputArchive& ar) const override
+        void Serialize(cereal::BinaryOutputArchive& archive) const override
         {
-            ar(localPosition, localRotation, localScale);
+            archive(localPosition, localRotation, localScale);
         }
 
-        void Deserialize(cereal::BinaryInputArchive& ar) override
+        void Deserialize(cereal::BinaryInputArchive& archive) override
         {
-            ar(localPosition, localRotation, localScale);
+            archive(localPosition, localRotation, localScale);
 
             dirty = false;
         }
@@ -272,6 +275,7 @@ namespace MultiVoxel::Independent::Math
             dirty = true;
         }
 
+        [[nodiscard]]
         bool IsDirty() const override
         {
             return dirty;
@@ -282,6 +286,7 @@ namespace MultiVoxel::Independent::Math
             dirty = false;
         }
 
+        [[nodiscard]]
         std::string GetComponentTypeName() const override
         {
             return typeid(Transform).name();
@@ -302,7 +307,7 @@ namespace MultiVoxel::Independent::Math
 
         Transform() = default;
 
-        friend class ComponentFactory;
+        friend class MultiVoxel::Independent::ECS::ComponentFactory;
 
         bool dirty = true;
 

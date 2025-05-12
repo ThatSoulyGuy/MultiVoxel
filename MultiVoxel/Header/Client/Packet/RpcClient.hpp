@@ -16,7 +16,7 @@ using namespace MultiVoxel::Server::Rpc;
 
 namespace MultiVoxel::Client::Packet
 {
-    class RpcClient : public PacketSender, public PacketReceiver
+    class RpcClient final : public PacketSender, public PacketReceiver
     {
 
     public:
@@ -26,11 +26,12 @@ namespace MultiVoxel::Client::Packet
             requestList.push_back({ 0, RpcType::RequestFullSync, "", 0});
         }
 
-        std::future<std::shared_ptr<GameObject>> CreateGameObjectAsync(const std::string& name, NetworkId parentId)
+        std::future<std::shared_ptr<GameObject>> CreateGameObjectAsync(const std::string& name, const NetworkId parentId)
         {
             uint64_t callId = nextCallId++;
+
             {
-                std::lock_guard lk(mutex);
+                std::lock_guard guard(mutex);
                 pendingCreateMap.emplace(callId, std::promise<std::shared_ptr<GameObject>>());
             }
             
@@ -44,14 +45,60 @@ namespace MultiVoxel::Client::Packet
             requestList.push_back({ 0, RpcType::DestroyGameObject, name, 0 });
         }
 
-        void AddChildToGameObject(const std::string& name, NetworkId childId)
+        void AddChildToGameObject(const std::string& name, const NetworkId childId)
         {
             requestList.push_back({ 0, RpcType::AddChild, name, childId });
         }
 
-        void RemoveChildFromGameObject(const std::string& name, NetworkId childId)
+        void RemoveChildFromGameObject(const std::string& name, const NetworkId childId)
         {
             requestList.push_back({ 0, RpcType::RemoveChild, name, childId });
+        }
+
+        std::future<std::shared_ptr<Component>> AddComponentAsync(const NetworkId objectId, const std::string& compTypeName, const std::string& payload)
+        {
+            uint64_t callId = nextCallId++;
+            {
+                std::lock_guard guard(mutex);
+
+                pendingComponentMap.emplace(callId, std::promise<std::shared_ptr<Component>>());
+            }
+
+            requestList.push_back({ callId, RpcType::AddComponent, compTypeName, objectId, payload });
+
+            return pendingComponentMap[callId].get_future();
+        }
+
+        template<ComponentType T>
+        std::future<std::shared_ptr<T>> AddComponentAsync(const NetworkId objectId, std::shared_ptr<T> prototype)
+        {
+            static_assert(std::derived_from<T, Component>);
+
+            std::ostringstream stream;
+            {
+                cereal::BinaryOutputArchive archive(stream);
+                prototype->Serialize(archive);
+            }
+
+            auto baseFuture = AddComponentAsync(objectId, typeid(T).name(), stream.str());
+
+            std::promise<std::shared_ptr<T>> promise;
+            auto result = promise.get_future();
+
+            std::thread([baseFuture = std::move(baseFuture), promise = std::move(promise)]() mutable
+            {
+                const auto basePointer = baseFuture.get();
+                auto derived = std::dynamic_pointer_cast<T>(basePointer);
+
+                promise.set_value(derived);
+            }).detach();
+
+            return result;
+        }
+
+        void RemoveComponent(const NetworkId objectId, const std::string& typeName)
+        {
+            requestList.push_back({ 0, RpcType::RemoveComponent, typeName, objectId });
         }
 
         bool SendPacket(std::string& outName, std::string& outData) override
@@ -59,21 +106,45 @@ namespace MultiVoxel::Client::Packet
             if (requestList.empty())
                 return false;
 
-            std::ostringstream os;
-            cereal::BinaryOutputArchive ar(os);
+            std::ostringstream stream;
+            cereal::BinaryOutputArchive archive(stream);
 
-            ar(uint32_t(requestList.size()));
+            archive(static_cast<uint32_t>(requestList.size()));
 
-            for (auto& r : requestList)
+            for (auto& [callId, type, name, parentId, payload] : requestList)
             {
-                ar(r.callId, r.type);
-                ar(r.name, r.parentId);
+                archive(callId, type);
+
+                switch (type)
+                {
+                    case RpcType::CreateGameObject:
+                    case RpcType::AddChild:
+                    case RpcType::RequestFullSync:
+                        archive(name, parentId);
+                        break;
+
+                    case RpcType::DestroyGameObject:
+                        archive(parentId);
+                        break;
+
+                    case RpcType::AddComponent:
+                        archive(name, parentId);
+                        archive(payload);
+                        break;
+
+                    case RpcType::RemoveComponent:
+                        archive(name, parentId);
+                        break;
+
+                    default:
+                        break;
+                }
             }
 
             requestList.clear();
 
             outName = RpcChannelName;
-            outData = os.str();
+            outData = stream.str();
 
             return true;
         }
@@ -83,47 +154,102 @@ namespace MultiVoxel::Client::Packet
             if (name != RpcChannelName)
                 return;
 
-            std::istringstream is(data);
-            cereal::BinaryInputArchive ar(is);
+            std::istringstream stream(data);
+            cereal::BinaryInputArchive archive(stream);
 
-            uint32_t cnt; ar(cnt);
+            uint32_t callCount;
+            archive(callCount);
 
-            while (cnt--)
+            while (callCount--)
             {
                 uint64_t callId;
+                RpcType rpcType;
 
-                RpcType t;
+                archive(callId, rpcType);
 
-                ar(callId, t);
-
-                if (t == RpcType::CreateGameObjectResponse)
+                if (rpcType == RpcType::CreateGameObjectResponse)
                 {
                     NetworkId newId;
-                    std::string name;
+
+                    std::string gameObjectName;
+
                     NetworkId parentId;
-                    ar(newId, name, parentId);
 
-                    auto go = GameObject::Create(IndexedString(name));
+                    archive(newId, gameObjectName, parentId);
 
-                    go->SetNetworkId(newId);
+                    auto gameObject = GameObject::Create(IndexedString(gameObjectName));
+
+                    gameObject->SetNetworkId(newId);
 
                     if (parentId != 0)
-                        GameObjectManager::GetInstance().Get(parentId).value()->AddChild(go);
+                        GameObjectManager::GetInstance().Get(parentId).value()->AddChild(gameObject);
 
-                    GameObjectManager::GetInstance().Register(go);
+                    GameObjectManager::GetInstance().Register(gameObject);
 
-                    std::lock_guard lk(mutex);
+                    std::lock_guard guard(mutex);
 
-                    pendingCreateMap[callId].set_value(go);
+                    pendingCreateMap[callId].set_value(gameObject);
                     pendingCreateMap.erase(callId);
+                }
+                else if (rpcType == RpcType::AddComponentResponse)
+                {
+                    NetworkId objectId;
+                    std::string compTypeName;
+                    archive(objectId, compTypeName);
+
+                    std::string payload;
+
+                    archive(payload);
+
+                    auto optionalGameObject = GameObjectManager::GetInstance().Get(objectId);
+
+                    std::shared_ptr<Component> component = nullptr;
+
+                    if (optionalGameObject)
+                    {
+                        component = ComponentFactory::Create(compTypeName);
+                        
+                        optionalGameObject.value()->AddComponentDynamic(component);
+
+                        {
+                            std::istringstream componentStream(payload);
+                            cereal::BinaryInputArchive componentArchive(componentStream);
+
+                            if (auto* networkComponent = dynamic_cast<INetworkSerializable*>(component.get()))
+                                networkComponent->Deserialize(componentArchive);
+                        }
+                    }
+
+                    std::lock_guard guard(mutex);
+
+                    if (auto iterator = pendingComponentMap.find(callId); iterator != pendingComponentMap.end())
+                    {
+                        iterator->second.set_value(component);
+
+                        pendingComponentMap.erase(iterator);
+                    }
+                }
+                else if (rpcType == RpcType::RemoveComponentResponse)
+                {
+                    NetworkId objectId;
+
+                    std::string compTypeName;
+                    archive(objectId, compTypeName);
+
+                    if (auto optionalGameObject = GameObjectManager::GetInstance().Get(objectId))
+                        optionalGameObject.value()->RemoveComponentDynamic(ComponentFactory::Create(compTypeName));
                 }
             }
         }
 
         static RpcClient& GetInstance()
         {
-            static RpcClient inst;
-            return inst;
+            std::call_once(initializationFlag, [&]()
+            {
+                instance = std::unique_ptr<RpcClient>(new RpcClient());
+            });
+            
+            return *instance;
         }
 
         static const std::string RpcChannelName;
@@ -138,13 +264,24 @@ namespace MultiVoxel::Client::Packet
             RpcType type;
             std::string name;
             NetworkId parentId;
+            std::string payload;
         };
 
         uint64_t nextCallId{ 1 };
+
         std::mutex mutex;
         std::vector<Request> requestList;
         std::unordered_map<uint64_t, std::promise<std::shared_ptr<GameObject>>> pendingCreateMap;
-    };
+        std::unordered_map<uint64_t, std::promise<std::shared_ptr<Component>>> pendingComponentMap;
 
+        static std::once_flag initializationFlag;
+        static std::unique_ptr<RpcClient> instance;
+
+    };
+    
     const std::string RpcClient::RpcChannelName("RpcChannel");
+
+    std::once_flag RpcClient::initializationFlag;
+    std::unique_ptr<RpcClient> RpcClient::instance;
+
 }

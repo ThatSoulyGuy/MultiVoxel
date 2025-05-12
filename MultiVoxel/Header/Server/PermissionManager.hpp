@@ -18,30 +18,30 @@ namespace MultiVoxel::Server
         PermissionManager& operator=(const PermissionManager&) = delete;
         PermissionManager& operator=(PermissionManager&&) = delete;
 
-        void GrantPermission(HSteamNetConnection peer, RpcType rpc)
+        void GrantPermission(const HSteamNetConnection peer, const RpcType rpc)
         {
-            std::lock_guard _{ mutex };
+            std::lock_guard guard{ mutex };
 
             permissions[peer].insert(rpc);
         }
 
-        void RevokePermission(HSteamNetConnection peer, RpcType rpc)
+        void RevokePermission(const HSteamNetConnection peer, const RpcType rpc)
         {
-            std::lock_guard _{ mutex };
+            std::lock_guard guard{ mutex };
 
             permissions[peer].erase(rpc);
         }
 
-        bool HasPermission(HSteamNetConnection peer, RpcType rpc) const
+        bool HasPermission(const HSteamNetConnection peer, const RpcType rpc) const
         {
             if (!RpcNeedsElevation(rpc))
                 return true;
 
-            std::lock_guard _{ mutex };
+            std::lock_guard guard{ mutex };
 
-            auto it = permissions.find(peer);
+            const auto iterator = permissions.find(peer);
 
-            return it != permissions.end() && it->second.contains(rpc);
+            return iterator != permissions.end() && iterator->second.contains(rpc);
         }
 
         static PermissionManager& GetInstance()

@@ -2,7 +2,6 @@
 
 #include "Independent/Core/Settings.hpp"
 #include "Independent/ECS/GameObjectManager.hpp"
-#include "Independent/Network/PacketReceiver.hpp"
 #include "Independent/Network/PeerConnection.hpp"
 #include "Server/RPC/RpcTypes.hpp"
 #include "Server/PermissionManager.hpp"
@@ -20,140 +19,234 @@ namespace MultiVoxel::Server::Packet
 
     public:
 
-        void HandleRpc(PeerConnection& peer, const std::string& data)
+        static void HandleRpc(PeerConnection& peer, const std::string& data)
         {
-            HSteamNetConnection who = peer.GetHandle();
+            const HSteamNetConnection requester = peer.GetHandle();
 
-            std::istringstream is(data);
-            cereal::BinaryInputArchive ar(is);
+            std::istringstream stream(data);
+            cereal::BinaryInputArchive archive(stream);
 
-            uint32_t count;
-            ar(count);
+            uint32_t requestCount;
+            archive(requestCount);
 
-            while (count--)
+            while (requestCount--)
             {
                 uint64_t callId;
                 RpcType rpc;
 
-                ar(callId, rpc);
+                archive(callId, rpc);
 
-                if (!PermissionManager::GetInstance().HasPermission(who, rpc))
-                    continue;
+                //if (!PermissionManager::GetInstance().HasPermission(requester, rpc))
+                //    continue;
 
                 switch (rpc)
                 {
                     case RpcType::CreateGameObject:
                     {
-                        std::string name; NetworkId parentId;
-                        ar(name, parentId);
+                        std::string name;
+                        NetworkId parentId;
+
+                        archive(name, parentId);
                         HandleCreate(peer, callId, name, parentId);
+
                         break;
                     }
 
                     case RpcType::DestroyGameObject:
                     {
-                        NetworkId objId; ar(objId);
+                        NetworkId objId;
+
+                        archive(objId);
                         HandleDestroy(objId);
+
                         break;
                     }
 
                     case RpcType::AddChild:
                     {
                         NetworkId parent, child;
-                        ar(parent, child);
+
+                        archive(parent, child);
                         HandleAddChild(parent, child);
+
                         break;
                     }
 
                     case RpcType::RemoveChild:
                     {
                         NetworkId parent, child;
-                        ar(parent, child);
+
+                        archive(parent, child);
                         HandleRemoveChild(parent, child);
+
                         break;
                     }
 
                     case RpcType::RequestFullSync:
                         Settings::GetInstance().REPLICATION_SENDER.Get()->Reload();
                         break;
+
+                    case RpcType::AddComponent:
+                    {
+                        std::string compTypeName;
+                        NetworkId objectId;
+                        std::string payload;
+
+                        archive(compTypeName, objectId, payload);
+                        HandleAddComponent(peer, callId, compTypeName, objectId, payload);
+
+                        break;
+                    }
+
+                    case RpcType::RemoveComponent:
+                    {
+                        std::string compTypeName;
+                        NetworkId objectId;
+
+                        archive(compTypeName, objectId);
+                        HandleRemoveComponent(peer, 0, compTypeName, objectId);
+
+                        break;
+                    }
+
+                    default:
+                        break;
                 }
             }
-        }
-
-        static RpcReceiver& Create()
-        {
-            static RpcReceiver inst;
-
-            return inst;
         }
 
     private:
 
         RpcReceiver() = default;
 
-        void HandleCreate(PeerConnection& peer, uint64_t callId, const std::string& name, NetworkId parentId)
+        static void HandleCreate(PeerConnection& peer, uint64_t callId, const std::string& name, NetworkId parentId)
         {
-            auto go = GameObject::Create(IndexedString(name));
+            const auto gameObject = GameObject::Create(IndexedString(name));
 
-            if (auto optParent = GameObjectManager::GetInstance().Get(parentId))
-                optParent.value()->AddChild(go);
+            if (GameObjectManager::GetInstance().Has(parentId))
+                GameObjectManager::GetInstance().Get(parentId).value()->AddChild(gameObject);
 
-            GameObjectManager::GetInstance().Register(go);
+            GameObjectManager::GetInstance().Register(gameObject);
 
-            Settings::GetInstance().REPLICATION_SENDER.Get()->QueueSpawn(go);
+            Settings::GetInstance().REPLICATION_SENDER.Get()->QueueSpawn(gameObject);
+
+            std::ostringstream innerStream;
+
+            {
+                cereal::BinaryOutputArchive archive(innerStream);
+
+                archive(static_cast<uint32_t>(1));
+
+                archive(callId, RpcType::CreateGameObjectResponse, gameObject->GetNetworkId(), gameObject->GetName().operator std::string(), gameObject->GetParent().has_value() ? gameObject->GetParent().value()->GetNetworkId() : 0);
+            }
+
+            std::ostringstream stream;
+            cereal::BinaryOutputArchive archive(stream);
+
+            archive(std::string(RpcClient::RpcChannelName));
+
+            archive(innerStream.str());
+
+            auto const& buffer = stream.str();
+            const auto message = Message::Create(Message::Type::Custom, buffer.data(), buffer.size(), true);
+
+            peer.Send(message);
+
+            std::cout << "Sent message with buffer '" << buffer << "' to peer '" << peer.GetHandle() << "' with callId '" << callId << "'." << std::endl;
+        }
+
+        static void HandleDestroy(const NetworkId id)
+        {
+            if (auto optionalGameObject = GameObjectManager::GetInstance().Get(id))
+                GameObjectManager::GetInstance().Unregister(id);
+        }
+
+        static void HandleAddChild(const NetworkId parentId, const NetworkId childId)
+        {
+            auto& gameObjectManagerInstance = GameObjectManager::GetInstance();
+
+            if (const auto parent = gameObjectManagerInstance.Get(parentId))
+            {
+                if (const auto child = gameObjectManagerInstance.Get(childId))
+                    parent.value()->AddChild(child.value());
+            }
+        }
+
+        static void HandleRemoveChild(const NetworkId parentId, const NetworkId childId)
+        {
+            auto& gameObjectManagerInstance = GameObjectManager::GetInstance();
+
+            if (const auto parent = gameObjectManagerInstance.Get(parentId))
+                parent.value()->RemoveChild(childId);
+        }
+
+        static void HandleAddComponent(PeerConnection& peer, uint64_t callId, const std::string& compTypeName, NetworkId objectId, const std::string& payload)
+        {
+            auto optionalGameObject = GameObjectManager::GetInstance().Get(objectId);
+
+            if (!optionalGameObject)
+                return;
+
+            auto component = ComponentFactory::Create(compTypeName);
+            
+            optionalGameObject.value()->AddComponentDynamic(component);
+
+            if (auto networkComponent = dynamic_cast<INetworkSerializable*>(component.get()))
+            {
+                std::istringstream stream(payload);
+
+                cereal::BinaryInputArchive archive(stream);
+
+                networkComponent->Deserialize(archive);
+            }
+
+            Settings::GetInstance().REPLICATION_SENDER.Get()->QueueAddComponent(objectId, compTypeName);
 
             std::ostringstream inner;
 
             {
-                cereal::BinaryOutputArchive ar(inner);
+                cereal::BinaryOutputArchive archive(inner);
 
-                ar(uint32_t(1));
-
-                ar(callId,
-                    RpcType::CreateGameObjectResponse,
-                    go->GetNetworkId(),
-                    go->GetName().operator std::string(),
-                    go->GetParent().has_value() ? go->GetParent().value()->GetNetworkId() : 0);
+                archive(static_cast<uint32_t>(1));
+                archive(callId, RpcType::AddComponentResponse, objectId, compTypeName, payload);
             }
+
+            std::ostringstream outer;
+
+            {
+                cereal::BinaryOutputArchive archive(outer);
+
+                archive(std::string(RpcClient::RpcChannelName));
+                archive(inner.str());
+            }
+
+            auto buffer = outer.str();
+
+            peer.Send(Message::Create(Message::Type::Custom, buffer.data(), buffer.size(), true));
+        }
+
+        static void HandleRemoveComponent(const PeerConnection& peer, uint64_t, const std::string& compTypeName, NetworkId objectId)
+        {
+            if (const auto optionalGameObject = GameObjectManager::GetInstance().Get(objectId))
+                optionalGameObject.value()->RemoveComponentDynamic(ComponentFactory::Create(compTypeName));
+
+            Settings::GetInstance().REPLICATION_SENDER.Get()
+                    ->QueueRemoveComponent(objectId, compTypeName);
+
+            std::ostringstream inner;
+
+            cereal::BinaryOutputArchive innerArchive(inner);
+
+            innerArchive(static_cast<uint32_t>(1));
+            innerArchive(static_cast<uint64_t>(0), RpcType::RemoveComponentResponse, objectId, compTypeName);
 
             std::ostringstream os;
-            cereal::BinaryOutputArchive ar(os);
+            cereal::BinaryOutputArchive archive(os);
 
-            ar(std::string(RpcClient::RpcChannelName));
+            archive(std::string(RpcClient::RpcChannelName));
+            archive(inner.str());
 
-            ar(inner.str());
-
-            auto const& buf = os.str();
-            auto msg = Message::Create(Message::Type::Custom, buf.data(), buf.size(), true);
-
-            peer.Send(msg);
-
-            std::cout << "Sent message with buffer '" << buf << "' to peer '" << peer.GetHandle() << "' with callId '" << callId << "'." << std::endl;
-        }
-
-        void HandleDestroy(NetworkId id)
-        {
-            if (auto opt = GameObjectManager::GetInstance().Get(id))
-                GameObjectManager::GetInstance().Unregister(id);
-        }
-
-        void HandleAddChild(NetworkId parentId, NetworkId childId)
-        {
-            auto& mgr = GameObjectManager::GetInstance();
-
-            if (auto p = mgr.Get(parentId))
-            {
-                if (auto c = mgr.Get(childId))
-                    p.value()->AddChild(c.value());
-            }
-        }
-
-        void HandleRemoveChild(NetworkId parentId, NetworkId childId)
-        {
-            auto& mgr = GameObjectManager::GetInstance();
-
-            if (auto p = mgr.Get(parentId))
-                p.value()->RemoveChild(childId);
+            peer.Send(Message::Create(Message::Type::Custom, os.str().data(), os.str().size(), true));
         }
     };
 }

@@ -13,9 +13,7 @@
 #include <numeric>
 #include <cereal/cereal.hpp>
 #include <cereal/types/array.hpp>
-#include <cereal/types/vector.hpp>
-#include <cereal/archives/binary.hpp> 
-#include <cereal/archives/json.hpp>
+#include <cereal/archives/binary.hpp>
 
 namespace MultiVoxel::Independent::Math
 {

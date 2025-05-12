@@ -27,12 +27,12 @@ namespace MultiVoxel::Independent::Utility
                 return {};
             }
 
-            auto fileSize = file.tellg();
+            const auto fileSize = file.tellg();
             file.seekg(0);
 
             std::string result;
 
-            result.resize(static_cast<std::size_t>(fileSize));
+            result.resize(fileSize);
 
             if (!file.read(result.data(), fileSize))
             {

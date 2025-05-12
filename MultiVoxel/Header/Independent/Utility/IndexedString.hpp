@@ -7,7 +7,6 @@
 #include <ostream>
 #include <sstream>
 #include <cereal/cereal.hpp>
-#include <cereal/types/string.hpp>
 
 namespace MultiVoxel::Independent::Utility
 {
@@ -23,11 +22,12 @@ namespace MultiVoxel::Independent::Utility
 
 		IndexedString() = default;
 
-		std::string operator[](size_t index) const
+		std::string operator[](const size_t index) const
 		{
 			return data[index];
 		}
 
+		[[nodiscard]]
 		size_t Length() const
 		{
 			return data.size();
@@ -97,45 +97,40 @@ namespace MultiVoxel::Independent::Utility
 	}
 }
 
-namespace std
+template<>
+struct std::hash<MultiVoxel::Independent::Utility::IndexedString>
 {
-	template<>
-	struct hash<MultiVoxel::Independent::Utility::IndexedString>
+	std::size_t operator()(MultiVoxel::Independent::Utility::IndexedString const& key) const noexcept
 	{
-		std::size_t operator()(MultiVoxel::Independent::Utility::IndexedString const& key) const noexcept
+		std::size_t seed = 0;
+
+		for (size_t i = 0; i < key.Length(); ++i)
 		{
-			std::size_t seed = 0;
 			std::hash<std::string> hasher;
+			const auto& token = key[i];
 
-			for (size_t i = 0; i < key.Length(); ++i)
-			{
-				const auto& token = key[i];
-
-				seed ^= hasher(token) + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
-			}
-
-			return seed;
+			seed ^= hasher(token) + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
 		}
-	};
-}
+
+		return seed;
+	}
+};
 
 namespace cereal
 {
 	template <class Archive>
-	void save(Archive& ar, const MultiVoxel::Independent::Utility::IndexedString& is)
+	void save(Archive& ar, const MultiVoxel::Independent::Utility::IndexedString& string)
 	{
-		std::string s = static_cast<std::string>(is);
-
-		ar(s);
+		ar(string.operator std::string());
 	}
 
 	template <class Archive>
 	void load(Archive& ar, MultiVoxel::Independent::Utility::IndexedString& is)
 	{
-		std::string s;
+		std::string string;
 
-		ar(s);
+		ar(string);
 
-		is = MultiVoxel::Independent::Utility::IndexedString(s);
+		is = MultiVoxel::Independent::Utility::IndexedString(string);
 	}
 }

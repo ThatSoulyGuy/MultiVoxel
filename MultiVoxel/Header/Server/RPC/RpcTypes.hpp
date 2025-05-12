@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <cereal/archives/binary.hpp>
 
 namespace MultiVoxel::Server::Rpc
 {
@@ -12,19 +11,25 @@ namespace MultiVoxel::Server::Rpc
         AddChild = 2,
         RemoveChild = 3,
         RequestFullSync = 4,
+        AddComponent = 5,
+        RemoveComponent = 6,
         CreateGameObjectResponse = 128,
         AddChildResponse = 129,
+        AddComponentResponse = 130,
+        RemoveComponentResponse = 131
     };
 
-    inline bool RpcNeedsElevation(RpcType t)
+    inline bool RpcNeedsElevation(const RpcType type)
     {
-        switch (t)
+        switch (type)
         {
 
         case RpcType::CreateGameObject:
         case RpcType::DestroyGameObject:
         case RpcType::AddChild:
         case RpcType::RemoveChild:
+        case RpcType::AddComponent:
+        case RpcType::RemoveComponent:
             return true;
 
         default:

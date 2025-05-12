@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <concepts>
 #include <optional>
+#include <ranges>
 #include "Independent/Math/Transform.hpp"
 #include "Independent/Utility/IndexedString.hpp"
 #include "Independent/ECS/Component.hpp"
@@ -37,7 +38,7 @@ namespace MultiVoxel::Independent::ECS
 		{
 			child->SetParent(shared_from_this());
 
-			auto& name = child->name;
+			const auto& name = child->name;
 
 			childMap.insert({ child->name, std::move(child) });
 			childMapByNetworkId.insert({ childMap[name]->GetNetworkId(), childMap[name] });
@@ -56,7 +57,7 @@ namespace MultiVoxel::Independent::ECS
 			return std::make_optional<std::shared_ptr<GameObject>>(childMap[name]);
 		}
 
-		std::optional<std::shared_ptr<GameObject>> GetChild(NetworkId id)
+		std::optional<std::shared_ptr<GameObject>> GetChild(const NetworkId id)
 		{
 			if (childMapByNetworkId.contains(id))
 			{
@@ -79,7 +80,7 @@ namespace MultiVoxel::Independent::ECS
 			childMap.erase(name);
 		}
 
-		void RemoveChild(NetworkId id)
+		void RemoveChild(const NetworkId id)
 		{
 			if (childMap.contains(name)) 
 			{
@@ -92,7 +93,7 @@ namespace MultiVoxel::Independent::ECS
 		}
 
 		template <ComponentType T>
-		std::shared_ptr<T> AddComponent(std::shared_ptr<T> component)
+		std::shared_ptr<T> AddComponent(const std::shared_ptr<T>& component)
 		{
 			if (componentMap.contains(typeid(T)))
 			{
@@ -110,7 +111,7 @@ namespace MultiVoxel::Independent::ECS
 
 		void AddComponentDynamic(std::shared_ptr<Component> component)
 		{
-			auto type = std::type_index(typeid(*component));
+			const auto type = std::type_index(typeid(*component));
 
 			if (componentMap.contains(type))
 			{
@@ -142,7 +143,7 @@ namespace MultiVoxel::Independent::ECS
 		}
 
 		template <ComponentType T>
-		bool HasComponent()
+		bool HasComponent() const
 		{
 			return componentMap.contains(typeid(T));
 		}
@@ -157,6 +158,19 @@ namespace MultiVoxel::Independent::ECS
 			}
 
 			componentMap.erase(typeid(T));
+		}
+
+		void RemoveComponentDynamic(const std::shared_ptr<Component>& component)
+		{
+			const auto type = std::type_index(typeid(*component));
+
+			if (!componentMap.contains(type))
+			{
+				std::cerr << "Component map for game object '" << name << "' doesn't contain component '" << type.name() << "'!";
+				return;
+			}
+
+			componentMap.erase(type);
 		}
 
 		void SetParent(std::shared_ptr<GameObject> parent)
@@ -175,7 +189,7 @@ namespace MultiVoxel::Independent::ECS
 			}
 		}
 
-		std::optional<std::shared_ptr<GameObject>> GetParent()
+		std::optional<std::shared_ptr<GameObject>> GetParent() const
 		{
 			return parent.has_value() ? std::make_optional<std::shared_ptr<GameObject>>(parent.value().lock()) : std::nullopt;
 		}
@@ -192,10 +206,10 @@ namespace MultiVoxel::Independent::ECS
 
 		std::shared_ptr<Component> GetComponentByTypeName(const std::string& typeName)
 		{
-			for (auto& [idx, comp] : componentMap)
+			for (auto& component: componentMap | std::views::values)
 			{
-				if (typeid(*comp).name() == typeName)
-					return comp;
+				if (typeid(*component).name() == typeName)
+					return component;
 			}
 
 			return nullptr;
@@ -219,19 +233,19 @@ namespace MultiVoxel::Independent::ECS
 
 		void Update()
 		{
-			for (auto& [type, component] : componentMap)
+			for (const auto& component: componentMap | std::views::values)
 				component->Update();
 
-			for (auto& [name, child] : childMap)
+			for (const auto& child: childMap | std::views::values)
 				child->Update();
 		}
 
 		void Render()
 		{
-			for (auto& [type, component] : componentMap)
+			for (const auto& component: componentMap | std::views::values)
 				component->Render();
 
-			for (auto& [name, child] : childMap)
+			for (const auto& child: childMap | std::views::values)
 				child->Render();
 		}
 

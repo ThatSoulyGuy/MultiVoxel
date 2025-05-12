@@ -1,5 +1,7 @@
 #pragma once
 
+#include <ranges>
+
 #include "Independent/ECS/GameObjectManager.hpp"
 #include "Independent/Network/PacketSender.hpp"
 
@@ -18,7 +20,7 @@ namespace MultiVoxel::Server::Packet
             spawnQueue.push_back(go);
         }
 
-        void QueueDelete(NetworkId id)
+        void QueueDelete(const NetworkId id)
         {
             deleteQueue.push_back(id);
         }
@@ -33,6 +35,15 @@ namespace MultiVoxel::Server::Packet
             removeChildQueue.emplace_back(parent, child);
         }
 
+        void QueueAddComponent(NetworkId objectId, const std::string& compTypeName)
+        {
+            addComponentQueue.emplace_back(objectId, compTypeName);
+        }
+        void QueueRemoveComponent(NetworkId objectId, const std::string& compTypeName)
+        {
+            removeComponentQueue.emplace_back(objectId, compTypeName);
+        }
+
         void Reload() override
         {
             sent = false;
@@ -42,76 +53,91 @@ namespace MultiVoxel::Server::Packet
             addChildQueue.clear();
             removeChildQueue.clear();
 
-            for (auto& go : GameObjectManager::GetInstance().GetAll())
-                spawnQueue.push_back(go);
+            for (auto& gameObject : GameObjectManager::GetInstance().GetAll())
+                spawnQueue.push_back(gameObject);
 
-            for (auto& go : GameObjectManager::GetInstance().GetAll())
+            for (const auto& gameObject : GameObjectManager::GetInstance().GetAll())
             {
-                for (auto& [ti, comp] : go->GetComponentMap())
+                for (const auto& component : gameObject->GetComponentMap() | std::views::values)
                 {
-                    if (auto net = dynamic_cast<INetworkSerializable*>(comp.get()))
-                        net->MarkDirty();
+                    if (const auto networkComponent = dynamic_cast<INetworkSerializable*>(component.get()))
+                        networkComponent->MarkDirty();
                 }
             }
         }
 
         bool SendPacket(std::string& outName, std::string& outData) override
         {
-            if (sent) return false;
+            if (sent)
+                return false;
 
-            std::ostringstream os;
-            cereal::BinaryOutputArchive ar(os);
+            std::ostringstream stream;
+            cereal::BinaryOutputArchive archive(stream);
 
-            ar(uint32_t(spawnQueue.size()));
+            archive(static_cast<uint32_t>(spawnQueue.size()));
 
-            for (auto& go : spawnQueue)
-                ar(go->GetNetworkId(), go->GetName().operator std::string());
+            for (const auto& gameObject : spawnQueue)
+                archive(gameObject->GetNetworkId(), gameObject->GetName().operator std::string());
 
             spawnQueue.clear();
 
-            ar(uint32_t(deleteQueue.size()));
+            archive(static_cast<uint32_t>(deleteQueue.size()));
 
             for (auto id : deleteQueue)
-                ar(id);
+                archive(id);
 
             deleteQueue.clear();
 
-            ar(uint32_t(addChildQueue.size()));
+            archive(static_cast<uint32_t>(addChildQueue.size()));
 
-            for (auto& [p, c] : addChildQueue)
-                ar(p, c);
+            for (auto& [parentId, childId] : addChildQueue)
+                archive(parentId, childId);
 
             addChildQueue.clear();
 
-            ar(uint32_t(removeChildQueue.size()));
+            archive(static_cast<uint32_t>(removeChildQueue.size()));
 
-            for (auto& [p, c] : removeChildQueue)
-                ar(p, c);
+            for (auto& [parentId, childId] : removeChildQueue)
+                archive(parentId, childId);
 
             removeChildQueue.clear();
 
-            auto all = GameObjectManager::GetInstance().GetAll();
+            archive(static_cast<uint32_t>(addComponentQueue.size()));
 
-            ar(uint32_t(all.size()));
+            for (auto& [id, type] : addComponentQueue)
+                archive(id, type);
 
-            for (auto& go : all)
+            addComponentQueue.clear();
+
+            archive(static_cast<uint32_t>(removeComponentQueue.size()));
+
+            for (auto& [id, type] : removeComponentQueue)
+                archive(id, type);
+
+            removeComponentQueue.clear();
+
+            const auto gameObjectList = GameObjectManager::GetInstance().GetAll();
+
+            archive(static_cast<uint32_t>(gameObjectList.size()));
+
+            for (auto& gameObject : gameObjectList)
             {
-                for (auto& [ti, comp] : go->GetComponentMap())
+                for (const auto& component : gameObject->GetComponentMap() | std::views::values)
                 {
-                    if (auto net = dynamic_cast<INetworkSerializable*>(comp.get()); net && net->IsDirty())
+                    if (const auto networkComponent = dynamic_cast<INetworkSerializable*>(component.get()); networkComponent && networkComponent->IsDirty())
                     {
-                        ar(true, go->GetNetworkId(), net->GetComponentTypeName());
+                        archive(true, gameObject->GetNetworkId(), networkComponent->GetComponentTypeName());
 
-                        net->Serialize(ar);
-                        net->ClearDirty();
+                        networkComponent->Serialize(archive);
+                        networkComponent->ClearDirty();
                     }
                 }
             }
 
-            ar(false);
+            archive(false);
 
             outName = SyncChannelName;
-            outData = os.str();
+            outData = stream.str();
 
             sent = true;
 
@@ -126,6 +152,8 @@ namespace MultiVoxel::Server::Packet
         std::vector<NetworkId> deleteQueue;
         std::vector<std::pair<NetworkId, NetworkId>> addChildQueue;
         std::vector<std::pair<NetworkId, NetworkId>> removeChildQueue;
+        std::vector<std::pair<NetworkId, std::string>> addComponentQueue;
+        std::vector<std::pair<NetworkId, std::string>> removeComponentQueue;
 
     };
 }

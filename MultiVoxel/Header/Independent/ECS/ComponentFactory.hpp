@@ -10,10 +10,19 @@
 #define CONCAT_IMPL(a, b) a##b
 #define CONCAT(a, b)      CONCAT_IMPL(a, b)
 
-#define REGISTER_COMPONENT(Type)                                              \
+#define REGISTER_COMPONENT(type)                                               \
 namespace {                                                                    \
-    static const bool CONCAT(_component_registered_, __COUNTER__) = [](){     \
-        ComponentFactory::Register<Type>();                                    \
+    static const bool CONCAT(_component_registered_, __COUNTER__) = [](){      \
+        ComponentFactory::Register<type>();                                    \
+        return true;                                                           \
+    }();                                                                       \
+}
+
+#define REGISTER_COMPONENT_TEMPLATED(type)                                     \
+namespace {                                                                    \
+    template <typename T>                                                      \
+    static const bool CONCAT(_component_registered_, __COUNTER__) = [](){      \
+        ComponentFactory::Register<type<T>>();                                 \
         return true;                                                           \
     }();                                                                       \
 }
@@ -32,7 +41,7 @@ namespace MultiVoxel::Independent::ECS
         {
             const std::string key = typeid(T).name();
 
-            std::lock_guard<std::mutex> lg(GetMutex());
+            std::lock_guard guard(GetMutex());
 
             GetRegistry()[key] = []()
             {
@@ -42,15 +51,15 @@ namespace MultiVoxel::Independent::ECS
 
         static std::shared_ptr<Component> Create(const std::string& typeName)
         {
-            std::lock_guard<std::mutex> lg(GetMutex());
+            std::lock_guard guard(GetMutex());
 
-            auto& reg = GetRegistry();
-            auto it = reg.find(typeName);
+            auto& registry = GetRegistry();
+            const auto iterator = registry.find(typeName);
 
-            if (it == reg.end())
+            if (iterator == registry.end())
                 return nullptr;
 
-            return it->second();
+            return iterator->second();
         }
 
     private:
