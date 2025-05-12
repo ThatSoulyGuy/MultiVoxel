@@ -4,7 +4,7 @@
 #include <mutex>
 #include <memory>
 #include <glad/glad.h>
-#include <glfw/glfw3.h>
+#include <GLFW/glfw3.h>
 #include "Independent/Math/Vector.hpp"
 
 using namespace MultiVoxel::Independent::Math;

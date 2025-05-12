@@ -68,10 +68,10 @@ namespace MultiVoxel::Client::Render
 
         void Render() const
         {
-            if (!GetGameObject()->GetComponent<Shader>().has_value())
+            if (!GetGameObject()->template GetComponent<Shader>().has_value())
                 return;
 
-            GetGameObject()->GetComponent<Shader>().value()->Use();
+            GetGameObject()->template GetComponent<Shader>().value()->Use();
 
             glBindVertexArray(VAO);
 

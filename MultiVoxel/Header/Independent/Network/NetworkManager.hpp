@@ -4,9 +4,8 @@
 #include <memory>
 #include <vector>
 #include <string>
-#include <GameNetworkingSockets/steamnetworkingsockets.h>
-#include <GameNetworkingSockets/isteamnetworkingutils.h>
-#include <GameNetworkingSockets/steamnetworkingtypes.h>
+#include <steam/isteamnetworkingutils.h>
+#include <steam/steamnetworkingtypes.h>
 #include "Independent/Network/Message.hpp"
 #include "Independent/Network/MessageDispatcher.hpp"
 #include "Independent/Network/PeerConnection.hpp"

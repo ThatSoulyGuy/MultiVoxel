@@ -3,7 +3,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <mutex>
-#include <GameNetworkingSockets/steamnetworkingsockets.h>
+#include <steam/steamnetworkingsockets.h>
 #include "Server/RPC/RpcTypes.hpp"
 
 namespace MultiVoxel::Server

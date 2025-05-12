@@ -3,7 +3,7 @@
 #include <mutex>
 #include <queue>
 #include <vector>
-#include <GameNetworkingSockets/steamnetworkingsockets.h>
+#include <steam/steamnetworkingsockets.h>
 #include "Independent/Network/Message.hpp"
 
 namespace MultiVoxel::Independent::Network
