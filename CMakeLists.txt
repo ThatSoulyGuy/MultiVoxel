@@ -12,6 +12,15 @@ target_include_directories(MultiVoxel PUBLIC
   "${CMAKE_SOURCE_DIR}/MultiVoxel/Header"
 )
 
+if (WIN32 OR WIN64)
+  target_include_directories(MultiVoxel PUBLIC "${CMAKE_SOURCE_DIR}/Library/WindowsOnly/Header")
+  if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_link_libraries(MultiVoxel PUBLIC "${CMAKE_SOURCE_DIR}/Library/WindowsOnly/Debug/GameNetworkingSockets.lib")
+  else ()
+    target_link_libraries(MultiVoxel PUBLIC "${CMAKE_SOURCE_DIR}/Library/WindowsOnly/Release/GameNetworkingSockets.lib")
+  endif ()
+endif ()
+
 include(FetchContent)
 
 set(ABSL_ENABLE_INSTALL ON CACHE BOOL "" FORCE)
@@ -23,7 +32,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(absl)
 
 set(protobuf_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(protobuf_BUILD_PROTOC_BINARIES ON CACHE BOOL "" FORCE)   # <‑‑ was OFF
+set(protobuf_BUILD_PROTOC_BINARIES ON CACHE BOOL "" FORCE)
 FetchContent_Declare(
   protobuf
   GIT_REPOSITORY https://github.com/protocolbuffers/protobuf.git
@@ -31,7 +40,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(protobuf)
 
-# Make the just‑built protoc visible to children (e.g., GNS)
 set(CMAKE_PREFIX_PATH "${protobuf_BINARY_DIR};${CMAKE_PREFIX_PATH}")
 set(Protobuf_PROTOC_EXECUTABLE $<TARGET_FILE:protobuf::protoc>)
 
@@ -41,19 +49,21 @@ endif()
 
 find_package(OpenSSL REQUIRED)
 
-set(ENABLE_EXAMPLES   OFF CACHE BOOL "" FORCE)
-set(ENABLE_GAMESERVER OFF CACHE BOOL "" FORCE)
-set(ENABLE_CHRONOLOG  OFF CACHE BOOL "" FORCE)
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-set(STEAMNETWORKINGSOCKETS_STATIC_LINK  ON CACHE BOOL "" FORCE)
-FetchContent_Declare(
-  gns
-  GIT_REPOSITORY https://github.com/ValveSoftware/GameNetworkingSockets.git
-  GIT_TAG        master
-)
-FetchContent_MakeAvailable(gns)
+if (NOT WIN32 AND NOT WIN64)
+  set(ENABLE_EXAMPLES   OFF CACHE BOOL "" FORCE)
+  set(ENABLE_GAMESERVER OFF CACHE BOOL "" FORCE)
+  set(ENABLE_CHRONOLOG  OFF CACHE BOOL "" FORCE)
+  set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+  set(STEAMNETWORKINGSOCKETS_STATIC_LINK  ON CACHE BOOL "" FORCE)
+  FetchContent_Declare(
+    gns
+    GIT_REPOSITORY https://github.com/ValveSoftware/GameNetworkingSockets.git
+    GIT_TAG        master
+  )
+  FetchContent_MakeAvailable(gns)
 
-target_include_directories(MultiVoxel PRIVATE "${gns_SOURCE_DIR}/include")
+  target_include_directories(MultiVoxel PRIVATE "${gns_SOURCE_DIR}/include")
+endif ()
 
 FetchContent_Declare(glfw
   GIT_REPOSITORY https://github.com/glfw/glfw.git
@@ -104,12 +114,20 @@ FetchContent_MakeAvailable(Bullet)
 target_link_libraries(MultiVoxel PRIVATE BulletDynamics BulletCollision LinearMath)
 target_include_directories(MultiVoxel PRIVATE "${Bullet_SOURCE_DIR}/src")
 
-target_link_libraries(MultiVoxel PRIVATE
-  GameNetworkingSockets::GameNetworkingSockets
-  protobuf::libprotobuf
-  OpenSSL::SSL OpenSSL::Crypto
-  absl::strings
-)
+if (NOT WIN32 AND NOT WIN64)
+  target_link_libraries(MultiVoxel PRIVATE
+    GameNetworkingSockets::GameNetworkingSockets
+    protobuf::libprotobuf
+    OpenSSL::SSL OpenSSL::Crypto
+    absl::strings
+  )
+else ()
+  target_link_libraries(MultiVoxel PRIVATE
+          protobuf::libprotobuf
+          OpenSSL::SSL OpenSSL::Crypto
+          absl::strings
+  )
+endif ()
 
 add_custom_command(TARGET MultiVoxel POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_directory
