@@ -66,12 +66,12 @@ namespace MultiVoxel::Client::Render
             glBindVertexArray(0);
         }
 
-        void Render() const
+        void Render() override
         {
             if (!GetGameObject()->template GetComponent<Shader>().has_value())
                 return;
 
-            GetGameObject()->template GetComponent<Shader>().value()->Use();
+            GetGameObject()->template GetComponent<Shader>().value()->Bind();
 
             glBindVertexArray(VAO);
 

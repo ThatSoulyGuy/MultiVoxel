@@ -23,13 +23,7 @@ namespace MultiVoxel::Client::Render
 		Shader& operator=(const Shader&) = delete;
 		Shader& operator=(Shader&&) = delete;
 
-		void Initialize() override
-		{
-			if (!GetGameObject()->IsAuthoritative())
-				Generate();
-		}
-
-		void Use() const
+		void Bind() const
 		{
 			glUseProgram(id);
 		}
@@ -47,8 +41,6 @@ namespace MultiVoxel::Client::Render
 			{
 				vertexData = FileHelper::ReadFile(vertexPath);
 				fragmentData = FileHelper::ReadFile(fragmentPath);
-
-				Generate();
 			}
 
 			dirty = false;
@@ -94,6 +86,8 @@ namespace MultiVoxel::Client::Render
 			result->fragmentData = FileHelper::ReadFile(result->fragmentPath);
 			result->dirty = true;
 
+			result->Generate();
+
 			return result;
 		}
 
@@ -105,10 +99,10 @@ namespace MultiVoxel::Client::Render
 
 		void Generate()
 		{
-			if (!dirty)
+			if (isGenerated)
 				return;
 
-			GLuint vertex = glCreateShader(GL_VERTEX_SHADER);
+			const GLuint vertex = glCreateShader(GL_VERTEX_SHADER);
 
 			{
 				const char* source = vertexData.c_str();
@@ -152,7 +146,7 @@ namespace MultiVoxel::Client::Render
 				}
 			}
 
-			GLuint program = glCreateProgram();
+			const GLuint program = glCreateProgram();
 
 			glAttachShader(program, vertex);
 			glAttachShader(program, fragment);
@@ -181,7 +175,7 @@ namespace MultiVoxel::Client::Render
 
 			id = program;
 
-			dirty = false;
+			isGenerated = true;
 		}
 
 		bool dirty{};

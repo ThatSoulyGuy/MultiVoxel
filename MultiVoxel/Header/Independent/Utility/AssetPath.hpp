@@ -3,7 +3,6 @@
 #include <string>
 #include <format>
 #include <utility>
-#include <initializer_list>
 #include <filesystem>
 #include "Independent/Utility/IndexedString.hpp"
 
