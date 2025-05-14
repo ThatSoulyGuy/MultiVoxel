@@ -4,6 +4,7 @@
 #include <format>
 #include <utility>
 #include <initializer_list>
+#include <filesystem>
 #include "Independent/Utility/IndexedString.hpp"
 
 namespace MultiVoxel::Independent::Utility
@@ -13,7 +14,7 @@ namespace MultiVoxel::Independent::Utility
 
 	public:
 
-		AssetPath(std::string domain, IndexedString localPath) : domain(std::move(domain)), localPath(std::move(localPath)) { }
+		AssetPath(IndexedString domain, std::string localPath) : domain(std::move(domain)), localPath(std::move(localPath)) { }
 
 		AssetPath() = default;
 
@@ -32,7 +33,7 @@ namespace MultiVoxel::Independent::Utility
 		[[nodiscard]]
 		std::string GetFullPath() const
 		{
-			return std::format("Assets/{}/{}", domain, localPath.operator std::string());
+			return std::format("./Assets/{}/{}", domain.operator std::string(), localPath);
 		}
 
 		template <typename Archive>
@@ -43,8 +44,8 @@ namespace MultiVoxel::Independent::Utility
 
 	private:
 
-		std::string domain;
-		IndexedString localPath;
+		IndexedString domain;
+		std::string localPath;
 
 	};
 }

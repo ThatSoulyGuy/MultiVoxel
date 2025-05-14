@@ -63,7 +63,7 @@ namespace MultiVoxel::Client
 
 			Window::GetInstance().Initialize("MultiVoxel* 2.8.2", { 750, 450 });
 
-			ShaderManager::GetInstance().Register(Shader::Create({ "multivoxel.fat" }, { "MultiVoxel", { "Shader/Fat" } }));
+			ShaderManager::GetInstance().Register(Shader::Create({ "multivoxel.fat" }, { { "MultiVoxel" }, "Shader/Fat" }));
 		}
 
 		static void Initialize()

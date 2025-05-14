@@ -19,7 +19,7 @@ namespace MultiVoxel::Independent::Utility
 
 		static std::string ReadFile(const AssetPath& path)
 		{
-            std::ifstream file(path.GetFullPath(), std::ios::binary | std::ios::ate);
+            std::ifstream file(path.GetFullPath());
 
             if (!file.is_open())
             {

@@ -78,7 +78,7 @@ namespace MultiVoxel::Server
 
 		static void Initialize()
 		{
-			auto square = GameObjectManager::GetInstance().Register(GameObject::Create({ "default.some" }));
+			const auto square = GameObjectManager::GetInstance().Register(GameObject::Create({ "default.some" }));
 
 			square->AddComponent(std::make_shared<TestComponent>());
 

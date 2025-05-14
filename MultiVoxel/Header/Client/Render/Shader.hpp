@@ -88,8 +88,8 @@ namespace MultiVoxel::Client::Render
 
 			result->name = name;
 			result->localPath = localPath;
-			result->vertexPath = { localPath.GetDomain(), std::format("{}Vertex.glsl", localPath.GetLocalPath().operator std::string()) };
-			result->fragmentPath = { localPath.GetDomain(), std::format("{}Fragment.glsl", localPath.GetLocalPath().operator std::string()) };
+			result->vertexPath = { { localPath.GetDomain() }, std::format("{}Vertex.glsl", localPath.GetLocalPath().operator std::string()) };
+			result->fragmentPath = { { localPath.GetDomain() }, std::format("{}Fragment.glsl", localPath.GetLocalPath().operator std::string()) };
 			result->vertexData = FileHelper::ReadFile(result->vertexPath);
 			result->fragmentData = FileHelper::ReadFile(result->fragmentPath);
 			result->dirty = true;
