@@ -90,11 +90,6 @@ namespace MultiVoxel::Server
 			GameObjectManager::GetInstance().Update();
 		}
 
-		static void Render()
-		{
-			GameObjectManager::GetInstance().Render();
-		}
-
 		static void Uninitialize()
 		{
 			
@@ -111,7 +106,6 @@ namespace MultiVoxel::Server
 					ServerInterfaceLayer::GetInstance().HookEvent("preinitialize", [&]() { Preinitialize(); });
 					ServerInterfaceLayer::GetInstance().HookEvent("initialize", [&]() { Initialize(); });
 					ServerInterfaceLayer::GetInstance().HookEvent("update", [&]() { Update(); });
-					ServerInterfaceLayer::GetInstance().HookEvent("render", [&]() { Render(); });
 					ServerInterfaceLayer::GetInstance().HookEvent("uninitialize", [&]() { Uninitialize(); });
 
 					return std::move(result);

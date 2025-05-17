@@ -109,20 +109,22 @@ namespace MultiVoxel::Independent::ECS
 			return std::static_pointer_cast<T>(componentMap[typeid(T)]);
 		}
 
-		void AddComponentDynamic(std::shared_ptr<Component> component)
+		std::shared_ptr<Component> AddComponentDynamic(std::shared_ptr<Component> component)
 		{
 			const auto type = std::type_index(typeid(*component));
 
 			if (componentMap.contains(type))
 			{
 				std::cerr << "Component map for game object '" << name.operator std::string() << "' already has component '" << type.name() << "'!\n";
-				return;
+				return nullptr;
 			}
 
 			component->gameObject = shared_from_this();
 			component->Initialize();
 
 			componentMap[type] = std::move(component);
+
+			return std::static_pointer_cast<Component>(componentMap[type]);
 		}
 
 		template <ComponentType T>

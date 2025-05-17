@@ -30,12 +30,12 @@ namespace MultiVoxel::Client::Render
 
 		void Serialize(cereal::BinaryOutputArchive& archive) const override
 		{
-			archive(name, localPath, vertexPath, fragmentPath);
+			archive(name, localPath, vertexPath, fragmentPath, id);
 		}
 
 		void Deserialize(cereal::BinaryInputArchive& archive) override
 		{
-			archive(name, localPath, vertexPath, fragmentPath);
+			archive(name, localPath, vertexPath, fragmentPath, id);
 
 			if (!GetGameObject()->IsAuthoritative())
 			{

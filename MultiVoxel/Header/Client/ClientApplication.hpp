@@ -87,7 +87,6 @@ namespace MultiVoxel::Client
 					0, 2, 3
 				}));
 
-				component.get()->Generate();
 				std::cout << "Got here" << std::endl;
 			}).detach();
 		}

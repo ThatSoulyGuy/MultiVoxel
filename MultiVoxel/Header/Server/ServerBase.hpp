@@ -116,7 +116,6 @@ namespace MultiVoxel::Server
                 networkManager.FlushOutgoing();
 
                 ServerInterfaceLayer::GetInstance().CallEvent("update");
-                ServerInterfaceLayer::GetInstance().CallEvent("render");
 
                 if (auto elapsed = duration_cast<milliseconds>(steady_clock::now() - start); elapsed < tickInterval)
                     std::this_thread::sleep_for(tickInterval - elapsed);

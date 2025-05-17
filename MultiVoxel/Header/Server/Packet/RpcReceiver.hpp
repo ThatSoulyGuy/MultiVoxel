@@ -189,7 +189,7 @@ namespace MultiVoxel::Server::Packet
 
             auto component = ComponentFactory::Create(compTypeName);
             
-            optionalGameObject.value()->AddComponentDynamic(component);
+            component = optionalGameObject.value()->AddComponentDynamic(component);
 
             if (auto networkComponent = dynamic_cast<INetworkSerializable*>(component.get()))
             {

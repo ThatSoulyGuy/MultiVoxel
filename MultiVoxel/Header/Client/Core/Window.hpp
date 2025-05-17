@@ -31,6 +31,12 @@ namespace MultiVoxel::Client::Core
 			glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
 			glfwWindowHint(GLFW_VISIBLE, false);
 
+			glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+#ifdef __APPLE__
+			glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, true);
+#endif
+
 			handle = glfwCreateWindow(dimensions.x(), dimensions.y(), title.c_str(), nullptr, nullptr);
 
 			if (!handle)

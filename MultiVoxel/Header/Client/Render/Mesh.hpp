@@ -150,7 +150,7 @@ namespace MultiVoxel::Client::Render
         std::vector<T> vertices;
         std::vector<uint32_t> indices;
 
-        GLuint VAO{0}, VBO{0}, EBO{0};
+        GLuint VAO = 0, VBO = 0, EBO = 0;
     };
 
     REGISTER_COMPONENT_TEMPLATED(Mesh);
