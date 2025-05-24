@@ -13,10 +13,12 @@ namespace MultiVoxel::Server::Rpc
         RequestFullSync = 4,
         AddComponent = 5,
         RemoveComponent = 6,
+        MoveGameObjectRequest = 7,
         CreateGameObjectResponse = 128,
         AddChildResponse = 129,
         AddComponentResponse = 130,
-        RemoveComponentResponse = 131
+        RemoveComponentResponse = 131,
+        MoveGameObjectResponse = 132
     };
 
     inline bool RpcNeedsElevation(const RpcType type)

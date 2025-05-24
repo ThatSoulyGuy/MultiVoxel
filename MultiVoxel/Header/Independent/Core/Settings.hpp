@@ -1,5 +1,7 @@
 #pragma once
 
+// TODO: Remove this file and make ReplicationReceiver and ReplicationSender regular singletons. What was I thinking with this?
+
 #include <mutex>
 #include <memory>
 #include "Client/Packet/ReplicationReceiver.hpp"

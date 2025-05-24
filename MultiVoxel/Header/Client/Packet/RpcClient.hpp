@@ -26,6 +26,13 @@ namespace MultiVoxel::Client::Packet
             requestList.push_back({ 0, RpcType::RequestFullSync, "", 0});
         }
 
+        void MoveGameObject(const NetworkId id, const Vector<float, 3>& position, const Vector<float, 3>& rotation)
+        {
+            std::lock_guard guard(mutex);
+
+            requestList.push_back({ 0, RpcType::MoveGameObjectRequest, std::string(), id, SerializePositionRotation(position, rotation) });
+        }
+
         std::future<std::shared_ptr<GameObject>> CreateGameObjectAsync(const std::string& name, const NetworkId parentId)
         {
             uint64_t callId = nextCallId++;
@@ -69,7 +76,7 @@ namespace MultiVoxel::Client::Packet
             return pendingComponentMap[callId].get_future();
         }
 
-        template<ComponentType T>
+        template <ComponentType T>
         std::future<std::shared_ptr<T>> AddComponentAsync(const NetworkId objectId, std::shared_ptr<T> prototype)
         {
             static_assert(std::derived_from<T, Component>);
@@ -136,6 +143,10 @@ namespace MultiVoxel::Client::Packet
                         archive(name, parentId);
                         break;
 
+                    case RpcType::MoveGameObjectRequest:
+                        archive(parentId, payload);
+                        break;
+
                     default:
                         break;
                 }
@@ -167,7 +178,24 @@ namespace MultiVoxel::Client::Packet
 
                 archive(callId, rpcType);
 
-                if (rpcType == RpcType::CreateGameObjectResponse)
+                if (rpcType == RpcType::MoveGameObjectResponse)
+                {
+                    NetworkId id;
+                    std::string payload;
+
+                    archive(id, payload);
+
+                    auto [position, rotation] = DeserializePositionRotation(payload);
+
+                    if (auto gameObject = GameObjectManager::GetInstance().Get(id))
+                    {
+                        //gameObject.value()->GetTransform()->SetTargetTransform(position, rotation, 0.1f); TODO: Implement this later
+
+                        gameObject.value()->GetTransform()->SetLocalPosition(position);
+                        gameObject.value()->GetTransform()->SetLocalRotation(rotation);
+                    }
+                }
+                else if (rpcType == RpcType::CreateGameObjectResponse)
                 {
                     NetworkId newId;
 
@@ -257,6 +285,31 @@ namespace MultiVoxel::Client::Packet
     private:
 
         RpcClient() = default;
+
+        static std::string SerializePositionRotation(const Vector<float, 3>& position, const Vector<float, 3>& rotation)
+        {
+            std::ostringstream stream;
+
+            cereal::BinaryOutputArchive archive(stream);
+
+            archive(position, rotation);
+
+            return stream.str();
+        }
+
+        static std::pair<Vector<float, 3>, Vector<float, 3>> DeserializePositionRotation(const std::string& payload)
+        {
+            std::istringstream stream(payload);
+
+            cereal::BinaryInputArchive archive(stream);
+
+            Vector<float, 3> position = { 0, 0, 0 };
+            Vector<float, 3> rotation = { 0, 0, 0 };
+
+            archive(position, rotation);
+
+            return {position,rotation};
+        }
 
         struct Request
         {

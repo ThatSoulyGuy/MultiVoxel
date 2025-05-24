@@ -104,10 +104,10 @@ namespace MultiVoxel::Independent::ECS
 				gameObject->Update();
 		}
 
-		void Render()
+		void Render(const std::shared_ptr<MultiVoxel::Independent::Math::Camera>& camera)
 		{
 			for (const auto& gameObject: gameObjectMap | std::views::values)
-				gameObject->Render();
+				gameObject->Render(camera);
 		}
 
 		static GameObjectManager& GetInstance()

@@ -16,11 +16,11 @@ using namespace MultiVoxel::Independent::Utility;
 namespace MultiVoxel::Independent::ECS
 {
 	template <typename T>
-	concept ComponentType = std::derived_from<T, Component> && requires(T a)
+	concept ComponentType = std::derived_from<T, Component> && requires(T a, const std::shared_ptr<MultiVoxel::Independent::Math::Camera>& b)
 	{
 		{ a.Initialize() } -> std::same_as<void>;
 		{ a.Update() } -> std::same_as<void>;
-		{ a.Render() } -> std::same_as<void>;
+		{ a.Render(b) } -> std::same_as<void>;
 		{ a.GetGameObject() } -> std::convertible_to<std::shared_ptr<GameObject>>;
 	};
 
@@ -242,13 +242,13 @@ namespace MultiVoxel::Independent::ECS
 				child->Update();
 		}
 
-		void Render()
+		void Render(const std::shared_ptr<MultiVoxel::Independent::Math::Camera>& camera)
 		{
-			for (const auto& component: componentMap | std::views::values)
-				component->Render();
+ 			for (const auto& component: componentMap | std::views::values)
+				component->Render(camera);
 
 			for (const auto& child: childMap | std::views::values)
-				child->Render();
+				child->Render(camera);
 		}
 
 		static std::shared_ptr<GameObject> Create(const IndexedString& name)

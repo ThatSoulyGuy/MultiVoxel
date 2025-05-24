@@ -2,6 +2,7 @@
 
 #include "Independent/Core/Settings.hpp"
 #include "Independent/ECS/GameObjectManager.hpp"
+#include "Independent/Network/NetworkManager.hpp"
 #include "Independent/Network/PeerConnection.hpp"
 #include "Server/RPC/RpcTypes.hpp"
 #include "Server/PermissionManager.hpp"
@@ -105,6 +106,26 @@ namespace MultiVoxel::Server::Packet
 
                         archive(compTypeName, objectId);
                         HandleRemoveComponent(peer, 0, compTypeName, objectId);
+
+                        break;
+                    }
+
+                    case RpcType::MoveGameObjectRequest:
+                    {
+                        NetworkId id;
+                        std::string payload;
+
+                        archive(id, payload);
+
+                        auto [position, rotation] = DeserializePositionRotation(payload);
+
+                        if (auto gameObject = GameObjectManager::GetInstance().Get(id))
+                        {
+                            gameObject.value()->GetTransform()->SetLocalPosition(position, false);
+                            gameObject.value()->GetTransform()->SetLocalRotation(rotation, false);
+                        }
+
+                        BroadcastTransformUpdate(id, position, rotation);
 
                         break;
                     }
@@ -247,6 +268,51 @@ namespace MultiVoxel::Server::Packet
             archive(inner.str());
 
             peer.Send(Message::Create(Message::Type::Custom, os.str().data(), os.str().size(), true));
+        }
+
+        static void BroadcastTransformUpdate(NetworkId id, const Vector<float, 3>& p, const Vector<float, 3>& q)
+        {
+            std::ostringstream innerStream;
+
+            cereal::BinaryOutputArchive archiveInner(innerStream);
+
+            archiveInner(static_cast<uint32_t>(1), static_cast<uint64_t>(0), RpcType::MoveGameObjectResponse, id, SerializePositionRotation(p,q));
+
+            std::ostringstream outerStream;
+
+            cereal::BinaryOutputArchive archiveOuter(outerStream);
+
+            archiveOuter(std::string(RpcClient::RpcChannelName), innerStream.str());
+
+            auto buffer = outerStream.str();
+            auto message = Message::Create(Message::Type::Custom, buffer.data(), buffer.size(), true);
+
+            NetworkManager::GetInstance().Broadcast(message);
+        }
+
+        static std::string SerializePositionRotation(const Vector<float, 3>& position, const Vector<float, 3>& rotation)
+        {
+            std::ostringstream stream;
+
+            cereal::BinaryOutputArchive archive(stream);
+
+            archive(position, rotation);
+
+            return stream.str();
+        }
+
+        static std::pair<Vector<float, 3>, Vector<float, 3>> DeserializePositionRotation(const std::string& payload)
+        {
+            std::istringstream stream(payload);
+
+            cereal::BinaryInputArchive archive(stream);
+
+            Vector<float, 3> position = { 0, 0, 0 };
+            Vector<float, 3> rotation = { 0, 0, 0 };
+
+            archive(position, rotation);
+
+            return {position,rotation};
         }
     };
 }

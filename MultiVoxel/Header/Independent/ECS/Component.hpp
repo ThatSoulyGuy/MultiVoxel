@@ -5,6 +5,11 @@
 #include <string>
 #include <cereal/cereal.hpp>
 
+namespace MultiVoxel::Independent::Math
+{
+	class Camera;
+}
+
 namespace MultiVoxel::Independent::ECS
 {
 	using NetworkId = uint32_t;
@@ -49,7 +54,7 @@ namespace MultiVoxel::Independent::ECS
 		
 		virtual void Update() { }
 
-		virtual void Render() { }
+		virtual void Render(const std::shared_ptr<MultiVoxel::Independent::Math::Camera>&) { }
 
 		[[nodiscard]]
 		std::shared_ptr<GameObject> GetGameObject() const

@@ -8,6 +8,9 @@
 #include "Client/Render/Vertex.hpp"
 #include "Independent/ECS/Component.hpp"
 #include "Independent/ECS/ComponentFactory.hpp"
+#include "Independent/Math/Camera.hpp"
+
+using namespace MultiVoxel::Independent::Math;
 
 namespace MultiVoxel::Client::Render
 {
@@ -66,12 +69,15 @@ namespace MultiVoxel::Client::Render
             glBindVertexArray(0);
         }
 
-        void Render() override
+        void Render(const std::shared_ptr<Camera>& camera) override
         {
             if (!GetGameObject()->template GetComponent<Shader>().has_value())
                 return;
 
             GetGameObject()->template GetComponent<Shader>().value()->Bind();
+            GetGameObject()->template GetComponent<Shader>().value()->SetUniform("projectionUniform", camera->GetProjectionMatrix());
+            GetGameObject()->template GetComponent<Shader>().value()->SetUniform("viewUniform", camera->GetViewMatrix());
+            GetGameObject()->template GetComponent<Shader>().value()->SetUniform("modelUniform", GetGameObject()->GetTransform()->GetModelMatrix());
 
             glBindVertexArray(VAO);
 

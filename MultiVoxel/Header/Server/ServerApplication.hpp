@@ -12,55 +12,6 @@ using namespace MultiVoxel::Independent::ECS;
 
 namespace MultiVoxel::Server
 {
-	class TestComponent final : public Component, public INetworkSerializable
-	{
-
-	public:
-
-		bool dirty = true;
-
-		void Initialize() override
-		{
-			std::cout << "Hi :D" << std::endl;
-		}
-
-		void Update() override
-		{
-			if (GetGameObject()->IsAuthoritative())
-				std::cout << "Hi from server" << std::endl;
-			else
-				std::cout << "Hi from client" << std::endl;
-		}
-
-		void Serialize(cereal::BinaryOutputArchive& ar) const override { }
-
-		void Deserialize(cereal::BinaryInputArchive& ar) override { }
-
-		void MarkDirty() override
-		{
-			dirty = true;
-		}
-
-		[[nodiscard]]
-		bool IsDirty() const override
-		{
-			return dirty;
-		}
-
-		void ClearDirty() override
-		{
-			dirty = false;
-		}
-
-		[[nodiscard]]
-		std::string GetComponentTypeName() const override
-		{
-			return typeid(TestComponent).name();
-		}
-	};
-
-	REGISTER_COMPONENT(TestComponent);
-
 	class ServerApplication final
 	{
 
@@ -78,11 +29,7 @@ namespace MultiVoxel::Server
 
 		static void Initialize()
 		{
-			const auto square = GameObjectManager::GetInstance().Register(GameObject::Create({ "default.some" }));
 
-			square->AddComponent(std::make_shared<TestComponent>());
-
-			Settings::GetInstance().REPLICATION_SENDER.Get()->QueueSpawn(square);
 		}
 
 		static void Update()

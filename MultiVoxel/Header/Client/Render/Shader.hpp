@@ -28,6 +28,46 @@ namespace MultiVoxel::Client::Render
 			glUseProgram(id);
 		}
 
+		void SetUniform(const std::string& name, const int value) const
+		{
+			const GLint location = glGetUniformLocation(id, name.c_str());
+
+			glUniform1i(location, value);
+		}
+
+		void SetUniform(const std::string& name, const bool value) const
+		{
+			SetUniform(name, static_cast<int>(value));
+		}
+
+		void SetUniform(const std::string& name, const float value) const
+		{
+			const GLint location = glGetUniformLocation(id, name.c_str());
+
+			glUniform1f(location, value);
+		}
+
+		void SetUniform(const std::string& name, const Vector<float, 2>& value) const
+		{
+			const GLint location = glGetUniformLocation(id, name.c_str());
+
+			glUniform2f(location, value[0], value[1]);
+		}
+
+		void SetUniform(const std::string& name, const Vector<float, 3>& value) const
+		{
+			const GLint location = glGetUniformLocation(id, name.c_str());
+
+			glUniform3f(location, value[0], value[1], value[2]);
+		}
+
+		void SetUniform(const std::string& name, const Matrix<float, 4, 4>& value) const
+		{
+			const GLint location = glGetUniformLocation(id, name.c_str());
+
+			glUniformMatrix4fv(location, 1, GL_FALSE, &value[0][0]);
+		}
+
 		void Serialize(cereal::BinaryOutputArchive& archive) const override
 		{
 			archive(name, localPath, vertexPath, fragmentPath, id);
