@@ -46,51 +46,51 @@ namespace MultiVoxel::Independent::ECS
 			return childMap[name];
 		}
 
-		std::optional<std::shared_ptr<GameObject>> GetChild(const IndexedString& name)
-		{
-			if (childMap.contains(name))
-			{
-				std::cerr << "Child map for game object '" << this->name << "' doesn't have game object '" << name << "'!";
-				return std::nullopt;
-			}
+                std::optional<std::shared_ptr<GameObject>> GetChild(const IndexedString& name)
+                {
+                        if (!childMap.contains(name))
+                        {
+                                std::cerr << "Child map for game object '" << this->name << "' doesn't have game object '" << name << "'!";
+                                return std::nullopt;
+                        }
 
-			return std::make_optional<std::shared_ptr<GameObject>>(childMap[name]);
-		}
+                        return std::make_optional<std::shared_ptr<GameObject>>(childMap[name]);
+                }
 
-		std::optional<std::shared_ptr<GameObject>> GetChild(const NetworkId id)
-		{
-			if (childMapByNetworkId.contains(id))
-			{
-				std::cerr << "Child map for game object '" << this->name << "' doesn't have game object '" << id << "'!";
-				return std::nullopt;
-			}
+                std::optional<std::shared_ptr<GameObject>> GetChild(const NetworkId id)
+                {
+                        if (!childMapByNetworkId.contains(id))
+                        {
+                                std::cerr << "Child map for game object '" << this->name << "' doesn't have game object '" << id << "'!";
+                                return std::nullopt;
+                        }
 
-			return std::make_optional<std::shared_ptr<GameObject>>(childMapByNetworkId[id].lock());
-		}
+                        return std::make_optional<std::shared_ptr<GameObject>>(childMapByNetworkId[id].lock());
+                }
 
-		void RemoveChild(const IndexedString& name)
-		{
-			if (childMap.contains(name))
-			{
-				std::cerr << "Child map for game object '" << this->name << "' doesn't have game object '" << name << "'!";
-				return;
-			}
+                void RemoveChild(const IndexedString& name)
+                {
+                        if (!childMap.contains(name))
+                        {
+                                std::cerr << "Child map for game object '" << this->name << "' doesn't have game object '" << name << "'!";
+                                return;
+                        }
 
-			childMapByNetworkId.erase(childMap[name]->GetNetworkId());
-			childMap.erase(name);
-		}
+                        childMapByNetworkId.erase(childMap[name]->GetNetworkId());
+                        childMap.erase(name);
+                }
 
-		void RemoveChild(const NetworkId id)
-		{
-			if (childMap.contains(name)) 
-			{
-				std::cerr << "Child map for game object '" << this->name << "' doesn't have game object '" << name << "'!";
-				return;
-			}
+                void RemoveChild(const NetworkId id)
+                {
+                        if (!childMapByNetworkId.contains(id))
+                        {
+                                std::cerr << "Child map for game object '" << this->name << "' doesn't have game object '" << id << "'!";
+                                return;
+                        }
 
-			childMap.erase(childMapByNetworkId[id].lock()->GetName());
-			childMapByNetworkId.erase(id);
-		}
+                        childMap.erase(childMapByNetworkId[id].lock()->GetName());
+                        childMapByNetworkId.erase(id);
+                }
 
 		template <ComponentType T>
 		std::shared_ptr<T> AddComponent(const std::shared_ptr<T>& component)
