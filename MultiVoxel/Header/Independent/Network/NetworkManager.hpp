@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 #include <string>
+#include <mutex>
 #include <steam/isteamnetworkingutils.h>
 #include <steam/steamnetworkingtypes.h>
 #include "Independent/Network/Message.hpp"
@@ -23,7 +24,7 @@ namespace MultiVoxel::Independent::Network
             GameNetworkingSockets_Kill();
         }
 
-        void PollEvents()  
+        void PollEvents()
         {
             sockets->RunCallbacks();
 
@@ -31,17 +32,32 @@ namespace MultiVoxel::Independent::Network
 
             while (sockets->ReceiveMessagesOnPollGroup(pollGroup, &netMsg, 1) > 0)
             {
-                for (const auto& peer : peerList)
+                PeerConnection* target = nullptr;
                 {
-                    if (peer->GetHandle() == netMsg->m_conn)
+                    std::lock_guard lock(peerListMutex);
+                    for (const auto& peer : peerList)
                     {
-                        peer->EnqueueReceived(netMsg);
-                        break;
+                        if (peer->GetHandle() == netMsg->m_conn)
+                        {
+                            target = peer.get();
+                            break;
+                        }
                     }
                 }
+
+                if (target)
+                    target->EnqueueReceived(netMsg);
             }
-            
-            for (auto& peer : peerList)
+
+            std::vector<PeerConnection*> peers;
+            {
+                std::lock_guard lock(peerListMutex);
+                peers.reserve(peerList.size());
+                for (const auto& peer : peerList)
+                    peers.push_back(peer.get());
+            }
+
+            for (auto* peer : peers)
             {
                 Message msg;
 
@@ -52,7 +68,15 @@ namespace MultiVoxel::Independent::Network
 
         void Broadcast(const Message& message) const
         {
-            for (auto& peer : peerList)
+            std::vector<PeerConnection*> peers;
+            {
+                std::lock_guard lock(peerListMutex);
+                peers.reserve(peerList.size());
+                for (const auto& peer : peerList)
+                    peers.push_back(peer.get());
+            }
+
+            for (auto* peer : peers)
                 peer->Send(message);
         }
 
@@ -96,7 +120,10 @@ namespace MultiVoxel::Independent::Network
 
             sockets->SetConnectionPollGroup(connection, pollGroup);
 
-            peerList.push_back(PeerConnection::Create(connection, sockets, pollGroup));
+            {
+                std::lock_guard lock(peerListMutex);
+                peerList.push_back(PeerConnection::Create(connection, sockets, pollGroup));
+            }
 
             return true;
         }
@@ -181,7 +208,10 @@ namespace MultiVoxel::Independent::Network
                 pollGroup = 0;
             }
 
-            peerList.clear();
+            {
+                std::lock_guard lock(peerListMutex);
+                peerList.clear();
+            }
         }
 
         static void OnDebugOutput(ESteamNetworkingSocketsDebugOutputType eType, const char* message)
@@ -225,7 +255,10 @@ namespace MultiVoxel::Independent::Network
                     return;
                 }
 
-                instance->peerList.push_back(PeerConnection::Create(info->m_hConn, instance->sockets, instance->pollGroup));
+                {
+                    std::lock_guard lock(instance->peerListMutex);
+                    instance->peerList.push_back(PeerConnection::Create(info->m_hConn, instance->sockets, instance->pollGroup));
+                }
 
                 std::cout << "New client connected (handle=" << info->m_hConn << ")\n";
             }
@@ -242,10 +275,13 @@ namespace MultiVoxel::Independent::Network
 
             case k_ESteamNetworkingConnectionState_ClosedByPeer:
             case k_ESteamNetworkingConnectionState_ProblemDetectedLocally:
-                std::erase_if(
-                    instance->peerList,
-                    [&](auto& p) { return p->GetHandle() == info->m_hConn; }
-                );
+                {
+                    std::lock_guard lock(instance->peerListMutex);
+                    std::erase_if(
+                        instance->peerList,
+                        [&](auto& p) { return p->GetHandle() == info->m_hConn; }
+                    );
+                }
                 std::cout << "Client disconnected (handle=" << info->m_hConn << ")\n";
                 break;
 
@@ -262,6 +298,7 @@ namespace MultiVoxel::Independent::Network
         HSteamListenSocket listenerSocket = k_HSteamListenSocket_Invalid;
 
         std::vector<std::function<void()>> playerConnectedCallbackList;
+        std::mutex peerListMutex;
         std::vector<std::unique_ptr<PeerConnection>> peerList;
 
         MessageDispatcher messageDispatcher;
