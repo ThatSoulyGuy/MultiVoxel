@@ -31,7 +31,7 @@ namespace MultiVoxel::Independent::Network
 
             while (sockets->ReceiveMessagesOnPollGroup(pollGroup, &netMsg, 1) > 0)
             {
-                for (auto& peer : peerList)
+                for (const auto& peer : peerList)
                 {
                     if (peer->GetHandle() == netMsg->m_conn)
                     {
@@ -209,8 +209,22 @@ namespace MultiVoxel::Independent::Network
         {
             if (info->m_info.m_eState == k_ESteamNetworkingConnectionState_Connecting && info->m_info.m_hListenSocket != k_HSteamListenSocket_Invalid)
             {
-                instance->sockets->AcceptConnection(info->m_hConn);
-                instance->sockets->SetConnectionPollGroup(info->m_hConn, instance->pollGroup);
+                if (instance->sockets->AcceptConnection(info->m_hConn) != k_EResultOK)
+                {
+                    std::cerr << "Failed to accept connection (handle=" << info->m_hConn << ")\n";
+                    instance->sockets->CloseConnection(info->m_hConn, 0, nullptr, false);
+
+                    return;
+                }
+
+                if (instance->sockets->SetConnectionPollGroup(info->m_hConn, instance->pollGroup) != k_EResultOK)
+                {
+                    std::cerr << "Failed to set poll group for connection (handle=" << info->m_hConn << ")\n";
+                    instance->sockets->CloseConnection(info->m_hConn, 0, nullptr, false);
+
+                    return;
+                }
+
                 instance->peerList.push_back(PeerConnection::Create(info->m_hConn, instance->sockets, instance->pollGroup));
 
                 std::cout << "New client connected (handle=" << info->m_hConn << ")\n";
